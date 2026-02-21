@@ -26,13 +26,25 @@ fi
 ARGS=$(cat /proc/cmdline)
 ARGS="_ $ARGS _"
 
+# Extract a named parameter from the kernel command line.
+# Usage: get_param PARAMNAME [SANITIZE_PATTERN]
+# If SANITIZE_PATTERN is given, characters NOT matching it are stripped.
+get_param() {
+  echo "$ARGS" | sed "s/.* ${1}=//" | sed 's/ .*//'
+}
+get_param_safe() {
+  echo "$ARGS" | sed "s/.* ${1}=//" | sed 's/ .*//' | sed "s/[^${2}]//g"
+}
+has_param() {
+  echo "$ARGS" | grep " ${1}" >/dev/null 2>&1
+}
+
 clear;echo
 d "Initializing ..."
 
 HOSTNAME="Tor_VM"
-echo $ARGS | grep ' USEHOSTNAME=' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  HOSTNAME=$(echo $ARGS | sed 's/.* USEHOSTNAME=//' | sed 's/ .*//' | sed 's/[^0-9a-zA-Z_-]//g')
+if has_param 'USEHOSTNAME='; then
+  HOSTNAME=$(get_param_safe USEHOSTNAME '0-9a-zA-Z_-')
 fi
 export HOSTNAME
 hostname "$HOSTNAME" >/dev/null 2>&1
@@ -52,20 +64,18 @@ else
   hddev=/dev/vda
 fi
 mkdir -p /home
-if [ -e $hddev ] && mount $hdmntopt $hddev /home; then
+if [ -e "$hddev" ] && mount "$hdmntopt" "$hddev" /home; then
   # check for saved entropy state and launch update daemon if exists
   syshome=/home/system
-  if [ ! -d $syshome ]; then
-    mkdir -p $syshome
+  if [ ! -d "$syshome" ]; then
+    mkdir -p "$syshome"
   fi
-  chown root:root $syshome
-  chmod 700 $syshome
+  chown root:root "$syshome"
+  chmod 700 "$syshome"
   rndstate=$syshome/.rnd
-  if [ -f $rndstate ]; then
-    cat $rndstate > /dev/urandom 2>/dev/null
+  if [ -f "$rndstate" ]; then
+    cat "$rndstate" > /dev/urandom 2>/dev/null
   fi
-  # incorporate digest of kernel command line into entropy pool
-  sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
   # launch process to periodically save entropy from pool for next boot
   nohup /bin/sh /bin/entropy-update.sh "$rndstate" >/dev/null 2>&1 &
 else
@@ -75,18 +85,14 @@ else
 fi
 
 # seed entropy from ENTROPY kernel cmdline param if present
-echo $ARGS | grep ' ENTROPY=' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  ENTROPY=$(echo $ARGS | sed 's/.* ENTROPY=//' | sed 's/ .*//')
+if has_param 'ENTROPY='; then
+  ENTROPY=$(get_param_safe ENTROPY '0-9a-fA-F')
   echo "$ENTROPY" > /dev/urandom 2>/dev/null
 fi
 # also seed from sha1 of full cmdline
 sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
 
-mkdir -p /var/run
-mkdir -p /var/log
-mkdir -p /var/lock
-mkdir -p /var/state
+mkdir -p /var/run /var/log /var/lock /var/state
 touch /var/log/wtmp
 touch /var/log/lastlog
 
@@ -96,77 +102,71 @@ ip link set lo up
 ip addr add 127.0.0.1/8 dev lo
 vmr_init
 
-echo $ARGS | grep ' NOINIT ' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
+if has_param 'NOINIT '; then
   d "NOINIT set, dropping to shell."
   exec /bin/sh
 else
 
 PRIVIP=10.10.10.1
 PRIVINTF=eth1
-echo $ARGS | grep ' PRIVIP=' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  PRIVIP=$(echo $ARGS | sed 's/.* PRIVIP=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
+if has_param 'PRIVIP='; then
+  PRIVIP=$(get_param_safe PRIVIP '0-9.')
 fi
 if grep -q "${PRIVINTF}:" /proc/net/dev 2>/dev/null; then
-  ip link set $PRIVINTF up
-  ip addr add ${PRIVIP}/30 dev $PRIVINTF
+  ip link set "$PRIVINTF" up
+  ip addr add "${PRIVIP}/30" dev "$PRIVINTF"
 else
   unset PRIVINTF
 fi
 
 # parse CTLSOCK and HASHPW for Tor control
-echo $ARGS | grep ' CTLSOCK=' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  CTLADDR=$(echo $ARGS | sed 's/.* CTLSOCK=//' | sed 's/ .*//')
-  CTLIP=$(echo $CTLADDR | sed 's/:.*//')
-  CTLPORT=$(echo $CTLADDR | sed 's/.*://')
+if has_param 'CTLSOCK='; then
+  CTLADDR=$(get_param CTLSOCK)
+  CTLIP=$(echo "$CTLADDR" | sed 's/:.*//')
+  CTLPORT=$(echo "$CTLADDR" | sed 's/.*://')
 fi
-echo $ARGS | grep ' HASHPW=' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  HASHPW=$(echo $ARGS | sed 's/.* HASHPW=//' | sed 's/ .*//')
+if has_param 'HASHPW='; then
+  HASHPW=$(get_param HASHPW)
 fi
 
-echo $ARGS | grep ' DEBUGINIT ' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
+if has_param 'DEBUGINIT '; then
   vmr_logdrop
   d "DEBUGINIT set, dropping to shell after network setup."
 fi
 
 # if we're passed IP/routing info then do network pivot, otherwise just use dhcp
 netup=0
-echo $ARGS | grep ' IP=' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  export IP=$(echo $ARGS | sed 's/.* IP=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
-  export MASK=$(echo $ARGS | sed 's/.* MASK=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
-  export GW=$(echo $ARGS | sed 's/.* GW=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
-  export MAC=$(echo $ARGS | sed 's/.* MAC=//' | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.]//g')
-  MTU=$(echo $ARGS | sed 's/.* MTU=//' | sed 's/ .*//' | sed 's/[^0-9]//g')
+if has_param 'IP='; then
+  export IP=$(get_param_safe IP '0-9.')
+  export MASK=$(get_param_safe MASK '0-9.')
+  export GW=$(get_param_safe GW '0-9.')
+  export MAC=$(get_param_safe MAC '0-9a-fA-F:.')
+  MTU=$(get_param_safe MTU '0-9')
   dn "Setting IP $IP / $MASK via $GW ..."
-  ip link set eth0 address $MAC
-  ip addr add ${IP}/$(mask2cidr $MASK 2>/dev/null || echo $MASK) dev eth0
+  ip link set eth0 address "$MAC"
+  ip addr add "${IP}/$(mask2cidr "$MASK" 2>/dev/null || echo "$MASK")" dev eth0
   ip link set eth0 up
-  ip link set eth0 mtu $MTU
-  ip route add default via $GW
+  ip link set eth0 mtu "$MTU"
+  ip route add default via "$GW"
   vmr_fwdsetup eth0
-  if [ ! -z $PRIVINTF ]; then
-    vmr_fwdadd $PRIVINTF $PRIVIP
+  if [ ! -z "$PRIVINTF" ]; then
+    vmr_fwdadd "$PRIVINTF" "$PRIVIP"
   fi
   netup=1
 else
   # dhcp for address
-  MAC=$(echo $ARGS | sed 's/.* MAC=//' | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.]//g')
-  MTU=$(echo $ARGS | sed 's/.* MTU=//' | sed 's/ .*//' | sed 's/[^0-9]//g')
+  MAC=$(get_param_safe MAC '0-9a-fA-F:.')
+  MTU=$(get_param_safe MTU '0-9')
   if [ -n "$MAC" ]; then
-    ip link set eth0 address $MAC
+    ip link set eth0 address "$MAC"
   fi
   if [ -n "$MTU" ]; then
-    ip link set eth0 mtu $MTU
+    ip link set eth0 mtu "$MTU"
   fi
   ip link set eth0 up
   vmr_fwdsetup eth0
-  if [ ! -z $PRIVINTF ]; then
-    vmr_fwdadd $PRIVINTF $PRIVIP
+  if [ ! -z "$PRIVINTF" ]; then
+    vmr_fwdadd "$PRIVINTF" "$PRIVIP"
   fi
   vmr_opendhcp eth0
 
@@ -196,8 +196,7 @@ else
   done=0
   cidx=1
   while [ $done -eq 0 ]; do
-    echo $ARGS | grep " ARPENT${cidx}" >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if has_param "ARPENT${cidx}"; then
       CENT=$(echo $ARGS | sed "s/.* ARPENT${cidx}=//" | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.-]//g')
       CMAC=$(echo $CENT | sed 's/-.*//')
       CIP=$(echo $CENT | sed 's/.*-//')
@@ -224,8 +223,7 @@ else
   d " for bootstrap status."
 fi
 
-echo $ARGS | grep ' DEBUGINIT ' >/dev/null 2>&1
-if [ $? -eq 0 ]; then
+if has_param 'DEBUGINIT '; then
   exec /bin/sh
 fi
 

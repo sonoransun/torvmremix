@@ -55,7 +55,7 @@ func NewLogger(opts Options) (*Logger, error) {
 	writers := []io.Writer{os.Stderr}
 
 	if opts.LogFile != "" {
-		f, err := os.OpenFile(opts.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+		f, err := os.OpenFile(opts.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			return nil, fmt.Errorf("open log file: %w", err)
 		}

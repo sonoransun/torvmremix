@@ -26,7 +26,6 @@ type App struct {
 
 	configPath string
 	cancel     context.CancelFunc
-	errCh      <-chan error
 
 	// Widgets updated by observers.
 	statusLight *StatusLight
@@ -84,11 +83,11 @@ func (a *App) startVM() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
-	a.errCh = a.engine.Start(ctx)
+	errCh := a.engine.Start(ctx)
 
 	// Watch for completion in the background.
 	go func() {
-		err := <-a.errCh
+		err := <-errCh
 		a.cancel = nil
 		if err != nil {
 			a.logger.Error("lifecycle error: %v", err)

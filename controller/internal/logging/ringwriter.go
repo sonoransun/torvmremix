@@ -29,11 +29,11 @@ func NewRingWriter(capacity int) *RingWriter {
 // in the ring buffer, and calls the onLine callback for each complete line.
 func (r *RingWriter) Write(p []byte) (int, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	data := r.partial + string(p)
 	r.partial = ""
 
+	var newLines []string
 	for {
 		idx := strings.IndexByte(data, '\n')
 		if idx < 0 {
@@ -42,22 +42,27 @@ func (r *RingWriter) Write(p []byte) (int, error) {
 		}
 		line := data[:idx]
 		data = data[idx+1:]
-		r.addLine(line)
+
+		r.lines[r.pos] = line
+		r.pos++
+		if r.pos >= r.capacity {
+			r.pos = 0
+			r.full = true
+		}
+		newLines = append(newLines, line)
+	}
+
+	cb := r.onLine
+	r.mu.Unlock()
+
+	// Invoke callback outside lock to prevent deadlock.
+	if cb != nil {
+		for _, line := range newLines {
+			cb(line)
+		}
 	}
 
 	return len(p), nil
-}
-
-func (r *RingWriter) addLine(line string) {
-	r.lines[r.pos] = line
-	r.pos++
-	if r.pos >= r.capacity {
-		r.pos = 0
-		r.full = true
-	}
-	if r.onLine != nil {
-		r.onLine(line)
-	}
 }
 
 // Lines returns a copy of all stored lines in chronological order.
@@ -78,7 +83,6 @@ func (r *RingWriter) Lines() []string {
 }
 
 // OnLine sets a callback that is invoked for each new complete line.
-// The callback is called while the lock is held; it must not block.
 func (r *RingWriter) OnLine(fn func(string)) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

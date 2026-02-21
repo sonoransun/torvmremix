@@ -14,7 +14,9 @@ for platform in $PLATFORMS; do
   EXT=""
   [ "$OS" = "windows" ] && EXT=".exe"
   echo "  Building torvm-${OS}-${ARCH}${EXT}..."
-  GOOS=$OS GOARCH=$ARCH go build -o "../dist/controller/torvm-${OS}-${ARCH}${EXT}" ./cmd/torvm/
+  GOOS=$OS GOARCH=$ARCH go build -trimpath -ldflags "-s -w" -o "../dist/controller/torvm-${OS}-${ARCH}${EXT}" ./cmd/torvm/ &
 done
+
+wait
 
 echo "Controller binaries in dist/controller/"

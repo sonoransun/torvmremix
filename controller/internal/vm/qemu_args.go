@@ -3,6 +3,7 @@ package vm
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/user/extorvm/controller/internal/config"
 	"github.com/user/extorvm/controller/internal/security"
@@ -13,6 +14,18 @@ import (
 // launchtorvm() functions in torvm.c.
 func (inst *Instance) BuildArgs() ([]string, error) {
 	cfg := inst.Config
+
+	// Reject paths containing null bytes to prevent injection.
+	for _, pair := range []struct{ name, path string }{
+		{"KernelPath", cfg.KernelPath},
+		{"InitrdPath", cfg.InitrdPath},
+		{"StateDiskPath", cfg.StateDiskPath},
+		{"QMPSocketPath", cfg.QMPSocketPath},
+	} {
+		if strings.Contains(pair.path, "\x00") {
+			return nil, fmt.Errorf("%s contains null byte", pair.name)
+		}
+	}
 
 	accel := cfg.Accel
 	if accel == "" {

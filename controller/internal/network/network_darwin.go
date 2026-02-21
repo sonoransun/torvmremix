@@ -44,31 +44,24 @@ func (m *darwinManager) RestoreConfig(cfg *SavedConfig) error {
 }
 
 func (m *darwinManager) SetupRouting(tapName string, vmIP net.IP) error {
-	if err := runDarwin("route", "-n", "add", "-net", "0.0.0.0/1", vmIP.String()); err != nil {
+	if err := run("route", "-n", "add", "-net", "0.0.0.0/1", vmIP.String()); err != nil {
 		return fmt.Errorf("add route 0.0.0.0/1: %w", err)
 	}
-	if err := runDarwin("route", "-n", "add", "-net", "128.0.0.0/1", vmIP.String()); err != nil {
+	if err := run("route", "-n", "add", "-net", "128.0.0.0/1", vmIP.String()); err != nil {
 		return fmt.Errorf("add route 128.0.0.0/1: %w", err)
 	}
 	return nil
 }
 
 func (m *darwinManager) TeardownRouting() error {
-	_ = runDarwin("route", "-n", "delete", "-net", "0.0.0.0/1")
-	_ = runDarwin("route", "-n", "delete", "-net", "128.0.0.0/1")
+	_ = run("route", "-n", "delete", "-net", "0.0.0.0/1")
+	_ = run("route", "-n", "delete", "-net", "128.0.0.0/1")
 	return nil
 }
 
 func (m *darwinManager) FlushDNS() error {
-	_ = runDarwin("dscacheutil", "-flushcache")
-	_ = runDarwin("killall", "-HUP", "mDNSResponder")
+	_ = run("dscacheutil", "-flushcache")
+	_ = run("killall", "-HUP", "mDNSResponder")
 	return nil
 }
 
-func runDarwin(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s %v: %s: %w", name, args, string(out), err)
-	}
-	return nil
-}

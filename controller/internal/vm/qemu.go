@@ -3,7 +3,10 @@ package vm
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/user/extorvm/controller/internal/config"
@@ -41,12 +44,34 @@ func (inst *Instance) Start(ctx context.Context) error {
 	}
 
 	// Write torrc overlay to state disk if bridge or proxy settings are configured.
-	overlay := inst.Config.TorrcOverlay()
+	overlay, err := inst.Config.TorrcOverlay()
+	if err != nil {
+		return fmt.Errorf("vm: torrc overlay: %w", err)
+	}
 	if overlay != "" {
 		if err := WriteStateDiskFile(inst.Config.StateDiskPath, "torrc.override", overlay); err != nil {
 			return fmt.Errorf("vm: write torrc overlay: %w", err)
 		}
 		inst.Logger.Info("wrote torrc overlay to state disk")
+	}
+
+	// Verify VM image files exist before launching QEMU.
+	for _, pair := range []struct{ name, path string }{
+		{"kernel", inst.Config.KernelPath},
+		{"initrd", inst.Config.InitrdPath},
+		{"state disk", inst.Config.StateDiskPath},
+	} {
+		if _, err := os.Stat(pair.path); err != nil {
+			return fmt.Errorf("vm: %s file not found: %w", pair.name, err)
+		}
+	}
+
+	// Create QMP socket directory with restrictive permissions.
+	if runtime.GOOS != "windows" {
+		qmpDir := filepath.Dir(inst.Config.QMPSocketPath)
+		if err := os.MkdirAll(qmpDir, 0700); err != nil {
+			return fmt.Errorf("vm: create QMP socket dir: %w", err)
+		}
 	}
 
 	args, err := inst.BuildArgs()
@@ -85,6 +110,8 @@ func (inst *Instance) Stop(ctx context.Context) error {
 		inst.mu.Unlock()
 		return nil
 	}
+	// Capture process reference while holding the lock to avoid race.
+	proc := inst.Process
 	inst.mu.Unlock()
 
 	// Try graceful shutdown via QMP.
@@ -104,12 +131,12 @@ func (inst *Instance) Stop(ctx context.Context) error {
 		}
 	}
 
-	// Fallback: kill the process.
+	// Fallback: kill the process using captured reference.
 	inst.mu.Lock()
 	defer inst.mu.Unlock()
-	if inst.running && inst.Process != nil && inst.Process.Process != nil {
+	if inst.running && proc != nil && proc.Process != nil {
 		inst.Logger.Info("killing QEMU process")
-		return inst.Process.Process.Kill()
+		return proc.Process.Kill()
 	}
 	return nil
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
+	"runtime"
 	"time"
 
 	"github.com/user/extorvm/controller/internal/config"
@@ -100,7 +102,9 @@ func (e *Engine) Run(ctx context.Context) error {
 			e.transition(StateCheckPrivileges)
 
 		case StateCheckPrivileges:
-			// Privilege checks are platform-specific; for now, proceed.
+			if err := checkPrivileges(); err != nil {
+				return err
+			}
 			e.transition(StateSaveNetwork)
 
 		case StateSaveNetwork:
@@ -182,8 +186,18 @@ func (e *Engine) doSaveNetwork() error {
 
 func (e *Engine) doCreateTAP() error {
 	hostIP := net.ParseIP(e.Config.HostIP)
+	if hostIP == nil {
+		return fmt.Errorf("invalid HostIP: %q", e.Config.HostIP)
+	}
 	vmIP := net.ParseIP(e.Config.VMIP)
-	mask := net.IPMask(net.ParseIP(e.Config.SubnetMask).To4())
+	if vmIP == nil {
+		return fmt.Errorf("invalid VMIP: %q", e.Config.VMIP)
+	}
+	maskIP := net.ParseIP(e.Config.SubnetMask)
+	if maskIP == nil {
+		return fmt.Errorf("invalid SubnetMask: %q", e.Config.SubnetMask)
+	}
+	mask := net.IPMask(maskIP.To4())
 
 	if err := e.Network.CreateTAP(e.Config.TAPName, hostIP, vmIP, mask); err != nil {
 		return err
@@ -228,6 +242,9 @@ func (e *Engine) doWaitTAP(ctx context.Context) error {
 
 func (e *Engine) doConfigureTAP() error {
 	vmIP := net.ParseIP(e.Config.VMIP)
+	if vmIP == nil {
+		return fmt.Errorf("invalid VMIP: %q", e.Config.VMIP)
+	}
 	if err := e.Network.SetupRouting(e.Config.TAPName, vmIP); err != nil {
 		return err
 	}
@@ -314,5 +331,16 @@ func (e *Engine) doRestoreNetwork() error {
 func (e *Engine) doCleanup() error {
 	e.FailSafe.Deactivate()
 	e.Logger.Info("lifecycle: cleanup complete")
+	return nil
+}
+
+func checkPrivileges() error {
+	if runtime.GOOS == "windows" {
+		// Windows privilege check is handled by the OS when creating TAP adapters.
+		return nil
+	}
+	if os.Getuid() != 0 {
+		return fmt.Errorf("must run as root (current uid=%d)", os.Getuid())
+	}
 	return nil
 }

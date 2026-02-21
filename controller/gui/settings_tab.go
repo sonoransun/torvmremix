@@ -3,6 +3,7 @@ package gui
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -19,22 +20,17 @@ func (a *App) settingsTab() fyne.CanvasObject {
 	memSlider := widget.NewSlider(64, 512)
 	memSlider.Step = 16
 	memSlider.Value = float64(a.cfg.VMMemoryMB)
-	memLabel := widget.NewLabel("VM Memory: " + intToStr(a.cfg.VMMemoryMB) + " MB")
+	memLabel := widget.NewLabel("VM Memory: " + strconv.Itoa(a.cfg.VMMemoryMB) + " MB")
 	memSlider.OnChanged = func(v float64) {
 		a.cfg.VMMemoryMB = int(v)
-		memLabel.SetText("VM Memory: " + intToStr(int(v)) + " MB")
+		memLabel.SetText("VM Memory: " + strconv.Itoa(int(v)) + " MB")
 	}
 
 	socksEntry := widget.NewEntry()
-	socksEntry.SetText(intToStr(a.cfg.SOCKSPort))
+	socksEntry.SetText(strconv.Itoa(a.cfg.SOCKSPort))
 	socksEntry.OnChanged = func(s string) {
-		n := 0
-		for _, c := range s {
-			if c >= '0' && c <= '9' {
-				n = n*10 + int(c-'0')
-			}
-		}
-		if n > 0 {
+		n, err := strconv.Atoi(s)
+		if err == nil && n >= 1 && n <= 65535 {
 			a.cfg.SOCKSPort = n
 		}
 	}
@@ -79,7 +75,7 @@ func (a *App) saveConfig() {
 		return
 	}
 
-	if err := os.WriteFile(path, data, 0640); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		dialog.ShowError(err, a.window)
 		return
 	}

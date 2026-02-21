@@ -1,6 +1,10 @@
 package network
 
-import "net"
+import (
+	"fmt"
+	"net"
+	"os/exec"
+)
 
 // Manager provides platform-specific network configuration.
 type Manager interface {
@@ -31,4 +35,12 @@ type Manager interface {
 type SavedConfig struct {
 	Data     []byte
 	Platform string
+}
+
+func run(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%s %v: %s: %w", name, args, string(out), err)
+	}
+	return nil
 }

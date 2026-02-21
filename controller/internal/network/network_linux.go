@@ -78,10 +78,3 @@ func (m *linuxManager) FlushDNS() error {
 	return nil
 }
 
-func run(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s %v: %s: %w", name, args, string(out), err)
-	}
-	return nil
-}

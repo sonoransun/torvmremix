@@ -2,6 +2,7 @@ package gui
 
 import (
 	"image/color"
+	"strings"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -15,9 +16,7 @@ import (
 // StatusLight is a colored circle widget that reflects lifecycle state.
 type StatusLight struct {
 	widget.BaseWidget
-	mu    sync.Mutex
-	state lifecycle.State
-	dot   *canvas.Circle
+	dot *canvas.Circle
 }
 
 // NewStatusLight creates a StatusLight starting in Init state.
@@ -32,9 +31,6 @@ func NewStatusLight() *StatusLight {
 
 // SetState updates the displayed state color.
 func (s *StatusLight) SetState(st lifecycle.State) {
-	s.mu.Lock()
-	s.state = st
-	s.mu.Unlock()
 	s.dot.FillColor = colorForState(st)
 	s.dot.Refresh()
 }
@@ -108,6 +104,22 @@ func (lv *LogView) Refresh() {
 	if n > 0 {
 		lv.list.ScrollToBottom()
 	}
+}
+
+// Clear resets the visible log snapshot.
+func (lv *LogView) Clear() {
+	lv.mu.Lock()
+	lv.snapshot = nil
+	lv.mu.Unlock()
+	lv.list.Refresh()
+}
+
+// CopyText returns all visible log lines joined by newlines.
+func (lv *LogView) CopyText() string {
+	lv.mu.Lock()
+	text := strings.Join(lv.snapshot, "\n")
+	lv.mu.Unlock()
+	return text
 }
 
 // CreateRenderer implements fyne.Widget.

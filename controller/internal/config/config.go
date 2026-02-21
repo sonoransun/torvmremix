@@ -2,9 +2,12 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // BridgeConfig holds Tor bridge and pluggable transport settings.
@@ -78,12 +81,18 @@ func DefaultConfig() *Config {
 func Load(path string) (*Config, error) {
 	cfg := DefaultConfig()
 	if path == "" {
+		if err := cfg.Validate(); err != nil {
+			return nil, fmt.Errorf("default config invalid: %w", err)
+		}
 		return cfg, nil
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if err := cfg.Validate(); err != nil {
+				return nil, fmt.Errorf("default config invalid: %w", err)
+			}
 			return cfg, nil
 		}
 		return nil, err
@@ -92,13 +101,103 @@ func Load(path string) (*Config, error) {
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation: %w", err)
+	}
 	return cfg, nil
+}
+
+// Validate checks all config fields for safety and correctness.
+func (c *Config) Validate() error {
+	// Validate IP addresses.
+	for _, pair := range []struct{ name, val string }{
+		{"HostIP", c.HostIP},
+		{"VMIP", c.VMIP},
+		{"SubnetMask", c.SubnetMask},
+		{"DNS1", c.DNS1},
+		{"DNS2", c.DNS2},
+	} {
+		if net.ParseIP(pair.val) == nil {
+			return fmt.Errorf("invalid IP for %s: %q", pair.name, pair.val)
+		}
+	}
+
+	// Validate ports.
+	if err := validatePort("SOCKSPort", c.SOCKSPort); err != nil {
+		return err
+	}
+	if err := validatePort("ControlPort", c.ControlPort); err != nil {
+		return err
+	}
+	if err := validatePort("TransPort", c.TransPort); err != nil {
+		return err
+	}
+	if err := validatePort("DNSPort", c.DNSPort); err != nil {
+		return err
+	}
+
+	// Validate VM memory.
+	if c.VMMemoryMB < 32 || c.VMMemoryMB > 4096 {
+		return fmt.Errorf("VMMemoryMB must be 32-4096, got %d", c.VMMemoryMB)
+	}
+
+	// Required paths must be non-empty.
+	for _, pair := range []struct{ name, val string }{
+		{"KernelPath", c.KernelPath},
+		{"InitrdPath", c.InitrdPath},
+		{"StateDiskPath", c.StateDiskPath},
+		{"QMPSocketPath", c.QMPSocketPath},
+	} {
+		if pair.val == "" {
+			return fmt.Errorf("%s must not be empty", pair.name)
+		}
+	}
+
+	// TAPName must be non-empty and free of shell metacharacters.
+	if c.TAPName == "" {
+		return fmt.Errorf("TAPName must not be empty")
+	}
+	if strings.ContainsAny(c.TAPName, ";|&$`\\\"'<>(){}!\n\r") {
+		return fmt.Errorf("TAPName contains invalid characters: %q", c.TAPName)
+	}
+
+	// Whitelist acceleration backends.
+	switch c.Accel {
+	case "", "kvm", "hvf", "whpx", "tcg":
+		// valid
+	default:
+		return fmt.Errorf("invalid Accel: %q", c.Accel)
+	}
+
+	// Whitelist proxy types.
+	switch c.Proxy.Type {
+	case "", "http", "https", "socks5":
+		// valid
+	default:
+		return fmt.Errorf("invalid Proxy.Type: %q", c.Proxy.Type)
+	}
+
+	// Whitelist bridge transports.
+	switch c.Bridge.Transport {
+	case "", "none", "obfs4", "meek-azure", "snowflake":
+		// valid
+	default:
+		return fmt.Errorf("invalid Bridge.Transport: %q", c.Bridge.Transport)
+	}
+
+	return nil
+}
+
+func validatePort(name string, port int) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("%s must be 1-65535, got %d", name, port)
+	}
+	return nil
 }
 
 func defaultQMPPath() string {
 	if runtime.GOOS == "windows" {
 		return `\\.\pipe\torvm-qmp`
 	}
-	dir := os.TempDir()
-	return filepath.Join(dir, "torvm-qmp.sock")
+	return "/run/torvm/qmp.sock"
 }
