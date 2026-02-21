@@ -1,0 +1,18 @@
+# Configuration for Tor VM
+User tor
+PidFile /var/run/tor/pid
+DataDirectory /home/tor/data
+Log notice file /var/log/tor/notices.log
+
+# This needs to be a network available via host default route
+VirtualAddrNetwork 10.254.0.0/16
+
+# Misc. options
+# note that we disable .exit notation to protect against some attacks
+AutomapHostsSuffixes .onion
+AutomapHostsOnResolve 1
+
+# options appended from command line placed below:
+SocksPort 0.0.0.0:9050
+DNSPort 0.0.0.0:9093
+TransPort 0.0.0.0:9095

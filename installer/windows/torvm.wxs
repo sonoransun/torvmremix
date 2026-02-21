@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="TorVM"
+           Manufacturer="The Tor Project, Inc."
+           Version="1.0.0"
+           UpgradeCode="3f874171-34a0-4af8-8c66-27a681ac5fb6"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of TorVM is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="TorVM">
+        <Directory Id="VMFOLDER" Name="vm" />
+      </Directory>
+    </StandardDirectory>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="TorVMExecutable">
+        <File Source="torvm.exe" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="VMComponents" Directory="VMFOLDER">
+      <Component Id="VMLinuz">
+        <File Source="vm\vmlinuz" />
+      </Component>
+      <Component Id="Initramfs">
+        <File Source="vm\initramfs.gz" />
+      </Component>
+      <Component Id="StateImg">
+        <File Source="vm\state.img" />
+      </Component>
+    </ComponentGroup>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="TorVMShortcutFolder" Name="TorVM">
+        <Component Id="TorVMShortcut">
+          <Shortcut Id="TorVMStartMenuShortcut"
+                    Name="TorVM"
+                    Target="[INSTALLFOLDER]torvm.exe"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\TorVM"
+                         Name="StartMenuShortcut" Type="integer" Value="1"
+                         KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="TorVM" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="VMComponents" />
+      <ComponentRef Id="TorVMShortcut" />
+    </Feature>
+  </Package>
+</Wix>

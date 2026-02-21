@@ -1,0 +1,238 @@
+#!/bin/sh
+# Copyright (C) 2008-2009  The Tor Project, Inc.
+# See LICENSE file for rights and terms.
+#
+d () {
+echo "    ${1}"
+}
+dn () {
+echo -n "    ${1}"
+}
+
+. /sbin/vmrouter.sh
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+
+# if we don't have /proc something is very wrong.
+# abort to shell as this is likely a test kernel image.
+if [ ! -d /proc/self ]; then
+  d "ERROR: unable to access /proc , aborting init."
+  exec /bin/sh
+fi
+
+# setup various runtime options using kernel parameters
+ARGS=$(cat /proc/cmdline)
+ARGS="_ $ARGS _"
+
+clear;echo
+d "Initializing ..."
+
+HOSTNAME="Tor_VM"
+echo $ARGS | grep ' USEHOSTNAME=' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  HOSTNAME=$(echo $ARGS | sed 's/.* USEHOSTNAME=//' | sed 's/ .*//' | sed 's/[^0-9a-zA-Z_-]//g')
+fi
+export HOSTNAME
+hostname "$HOSTNAME" >/dev/null 2>&1
+
+mkdir -p /dev/pts /dev/shm
+mount -t devpts devpts /dev/pts
+
+# check for paravirt disk device
+hdmntopt="-onoatime,nodiratime"
+if grep -q vda /proc/partitions 2>/dev/null; then
+  hddev=/dev/vda
+elif grep -q vda1 /proc/partitions 2>/dev/null; then
+  hddev=/dev/vda1
+elif grep -q sda1 /proc/partitions 2>/dev/null; then
+  hddev=/dev/sda1
+else
+  hddev=/dev/vda
+fi
+mkdir -p /home
+if [ -e $hddev ] && mount $hdmntopt $hddev /home; then
+  # check for saved entropy state and launch update daemon if exists
+  syshome=/home/system
+  if [ ! -d $syshome ]; then
+    mkdir -p $syshome
+  fi
+  chown root:root $syshome
+  chmod 700 $syshome
+  rndstate=$syshome/.rnd
+  if [ -f $rndstate ]; then
+    cat $rndstate > /dev/urandom 2>/dev/null
+  fi
+  # incorporate digest of kernel command line into entropy pool
+  sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
+  # launch process to periodically save entropy from pool for next boot
+  nohup /bin/sh /bin/entropy-update.sh "$rndstate" >/dev/null 2>&1 &
+else
+  echo 'ERROR: unable to mount persistent storage virtual disk!'
+  echo '       Do not run Tor in this configuration.'
+  sleep 3
+fi
+
+# seed entropy from ENTROPY kernel cmdline param if present
+echo $ARGS | grep ' ENTROPY=' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  ENTROPY=$(echo $ARGS | sed 's/.* ENTROPY=//' | sed 's/ .*//')
+  echo "$ENTROPY" > /dev/urandom 2>/dev/null
+fi
+# also seed from sha1 of full cmdline
+sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
+
+mkdir -p /var/run
+mkdir -p /var/log
+mkdir -p /var/lock
+mkdir -p /var/state
+touch /var/log/wtmp
+touch /var/log/lastlog
+
+[ -f /etc/sysctl.conf ] && sysctl -p >&-
+
+ip link set lo up
+ip addr add 127.0.0.1/8 dev lo
+vmr_init
+
+echo $ARGS | grep ' NOINIT ' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  d "NOINIT set, dropping to shell."
+  exec /bin/sh
+else
+
+PRIVIP=10.10.10.1
+PRIVINTF=eth1
+echo $ARGS | grep ' PRIVIP=' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  PRIVIP=$(echo $ARGS | sed 's/.* PRIVIP=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
+fi
+if grep -q "${PRIVINTF}:" /proc/net/dev 2>/dev/null; then
+  ip link set $PRIVINTF up
+  ip addr add ${PRIVIP}/30 dev $PRIVINTF
+else
+  unset PRIVINTF
+fi
+
+# parse CTLSOCK and HASHPW for Tor control
+echo $ARGS | grep ' CTLSOCK=' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  CTLADDR=$(echo $ARGS | sed 's/.* CTLSOCK=//' | sed 's/ .*//')
+  CTLIP=$(echo $CTLADDR | sed 's/:.*//')
+  CTLPORT=$(echo $CTLADDR | sed 's/.*://')
+fi
+echo $ARGS | grep ' HASHPW=' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  HASHPW=$(echo $ARGS | sed 's/.* HASHPW=//' | sed 's/ .*//')
+fi
+
+echo $ARGS | grep ' DEBUGINIT ' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  vmr_logdrop
+  d "DEBUGINIT set, dropping to shell after network setup."
+fi
+
+# if we're passed IP/routing info then do network pivot, otherwise just use dhcp
+netup=0
+echo $ARGS | grep ' IP=' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  export IP=$(echo $ARGS | sed 's/.* IP=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
+  export MASK=$(echo $ARGS | sed 's/.* MASK=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
+  export GW=$(echo $ARGS | sed 's/.* GW=//' | sed 's/ .*//' | sed 's/[^0-9.]//g')
+  export MAC=$(echo $ARGS | sed 's/.* MAC=//' | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.]//g')
+  MTU=$(echo $ARGS | sed 's/.* MTU=//' | sed 's/ .*//' | sed 's/[^0-9]//g')
+  dn "Setting IP $IP / $MASK via $GW ..."
+  ip link set eth0 address $MAC
+  ip addr add ${IP}/$(mask2cidr $MASK 2>/dev/null || echo $MASK) dev eth0
+  ip link set eth0 up
+  ip link set eth0 mtu $MTU
+  ip route add default via $GW
+  vmr_fwdsetup eth0
+  if [ ! -z $PRIVINTF ]; then
+    vmr_fwdadd $PRIVINTF $PRIVIP
+  fi
+  netup=1
+else
+  # dhcp for address
+  MAC=$(echo $ARGS | sed 's/.* MAC=//' | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.]//g')
+  MTU=$(echo $ARGS | sed 's/.* MTU=//' | sed 's/ .*//' | sed 's/[^0-9]//g')
+  if [ -n "$MAC" ]; then
+    ip link set eth0 address $MAC
+  fi
+  if [ -n "$MTU" ]; then
+    ip link set eth0 mtu $MTU
+  fi
+  ip link set eth0 up
+  vmr_fwdsetup eth0
+  if [ ! -z $PRIVINTF ]; then
+    vmr_fwdadd $PRIVINTF $PRIVIP
+  fi
+  vmr_opendhcp eth0
+
+  dn "Trying to get DHCP lease ..."
+  udhcpc -b -i eth0 -p /var/run/dhcp.eth0.pid >/dev/null 2>&1 &
+  maxrt=20
+  while [ $maxrt -gt 0 ]; do
+    sleep 1
+    ip addr show eth0 | grep 'inet ' >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+      netup=1
+      maxrt=0
+    else
+      echo -n "."
+      maxrt=$(expr $maxrt - 1)
+    fi
+  done
+fi
+
+if [ $netup -eq 0 ]; then
+  echo " FAILED.";echo
+  d "ERROR: Unable to get an IP address."
+  d "Check your DHCP server or configure one manually."
+  d "Remember to start Tor via /etc/init.d/tor start when ready."
+else
+  # set any static ARP entries AFTER DHCP / interface up
+  done=0
+  cidx=1
+  while [ $done -eq 0 ]; do
+    echo $ARGS | grep " ARPENT${cidx}" >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+      CENT=$(echo $ARGS | sed "s/.* ARPENT${cidx}=//" | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.-]//g')
+      CMAC=$(echo $CENT | sed 's/-.*//')
+      CIP=$(echo $CENT | sed 's/.*-//')
+      vmr_setarp eth0 $CIP $CMAC
+      cidx=$(expr $cidx + 1)
+    else
+      done=1
+    fi
+  done
+
+  echo " done.";echo
+
+  # Apply torrc overlay from state disk if present.
+  if [ -f /home/torrc.override ]; then
+    d "Applying torrc override ..."
+    cat /home/torrc.override >> /etc/tor/torrc
+  fi
+
+  dn "Starting Tor ... "
+  /etc/init.d/tor start
+  echo "done."
+  echo
+  d "Run /etc/init.d/tor status"
+  d " for bootstrap status."
+fi
+
+echo $ARGS | grep ' DEBUGINIT ' >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  exec /bin/sh
+fi
+
+# end if !NOINIT
+fi
+
+# keep init alive
+while true; do
+  sleep 3600
+done
