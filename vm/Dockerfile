@@ -4,7 +4,7 @@
 # ============================================================
 # Stage 1: Build the root filesystem
 # ============================================================
-FROM alpine:3.21 AS rootfs-builder
+FROM alpine:3.23 AS rootfs-builder
 
 # Install packages and set up directories/permissions in a single layer
 RUN mkdir -p /rootfs && \
@@ -49,14 +49,14 @@ RUN chmod 644 /rootfs/etc/tor/torrc && \
 # ============================================================
 # Stage 2: Extract the kernel
 # ============================================================
-FROM alpine:3.21 AS kernel
+FROM alpine:3.23 AS kernel
 
 RUN apk add --no-cache linux-virt
 
 # ============================================================
 # Stage 3: Assemble initramfs and state disk (final output)
 # ============================================================
-FROM alpine:3.21 AS output
+FROM alpine:3.23 AS output
 
 RUN apk add --no-cache cpio gzip e2fsprogs
 
