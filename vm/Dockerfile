@@ -16,7 +16,8 @@ RUN mkdir -p /rootfs && \
         iptables \
         iproute2 \
         e2fsprogs \
-        util-linux && \
+        util-linux \
+        rng-tools && \
     rm -rf /rootfs/var/cache/apk/* && \
     mkdir -p /rootfs/etc/tor \
              /rootfs/var/log/tor \

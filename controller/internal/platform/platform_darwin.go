@@ -7,13 +7,22 @@ import (
 	"strings"
 )
 
-func detectAccel() (AccelType, error) {
+func detect() (*Info, error) {
+	info := &Info{Accel: TCG}
+
 	out, err := exec.Command("sysctl", "-n", "kern.hv_support").Output()
-	if err != nil {
-		return TCG, err
+	if err == nil && strings.TrimSpace(string(out)) == "1" {
+		info.Accel = HVF
 	}
-	if strings.TrimSpace(string(out)) == "1" {
-		return HVF, nil
-	}
-	return TCG, nil
+
+	// macOS: no vhost-net kernel module.
+	// macOS: no IOMMU passthrough in QEMU (Hypervisor.framework provides
+	// its own device model isolation).
+
+	return info, nil
+}
+
+func detectAccel() (AccelType, error) {
+	info, _ := detect()
+	return info.Accel, nil
 }

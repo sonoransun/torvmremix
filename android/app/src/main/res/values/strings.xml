@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TorVM</string>
+    <string name="vpn_notification_channel">TorVM VPN</string>
+    <string name="vpn_notification_title">TorVM VPN Active</string>
+    <string name="vpn_notification_text">Routing traffic through Tor</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting\u2026</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_error">Error</string>
+    <string name="settings">Settings</string>
+    <string name="logs">Logs</string>
+    <string name="socks_host">SOCKS5 Host</string>
+    <string name="socks_port">SOCKS5 Port</string>
+    <string name="dns_host">DNS Host</string>
+    <string name="dns_port">DNS Port</string>
+    <string name="preset_direct">Direct (TAP)</string>
+    <string name="preset_wifi">WiFi/LAN</string>
+    <string name="save">Save</string>
+    <string name="vpn_permission_denied">VPN permission denied</string>
+</resources>

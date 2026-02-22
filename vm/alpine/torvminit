@@ -89,6 +89,12 @@ if has_param 'ENTROPY='; then
   ENTROPY=$(get_param_safe ENTROPY '0-9a-fA-F')
   echo "$ENTROPY" > /dev/urandom 2>/dev/null
 fi
+# seed from virtio-rng hardware RNG if available (provided by host via
+# virtio-rng-pci device). This is the highest quality entropy source.
+if [ -c /dev/hwrng ]; then
+  head -c 2048 /dev/hwrng > /dev/urandom 2>/dev/null
+  d "Seeded entropy from hardware RNG (virtio-rng)"
+fi
 # also seed from sha1 of full cmdline
 sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
 

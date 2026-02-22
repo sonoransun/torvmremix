@@ -7,18 +7,24 @@ import (
 	"strings"
 )
 
-func detectAccel() (AccelType, error) {
-	// Check for WHPX support by querying the Windows Hypervisor Platform
-	// capability via systeminfo. A more reliable check would use the
-	// WHvGetCapability API, but for simplicity we check if the
-	// Hyper-V hypervisor is present via the systeminfo output.
+func detect() (*Info, error) {
+	info := &Info{Accel: TCG}
+
 	out, err := exec.Command("systeminfo").Output()
 	if err == nil {
-		info := strings.ToLower(string(out))
-		if strings.Contains(info, "hypervisor has been detected") {
-			return WHPX, nil
+		lower := strings.ToLower(string(out))
+		if strings.Contains(lower, "hypervisor has been detected") {
+			info.Accel = WHPX
 		}
 	}
 
-	return TCG, nil
+	// Windows: no vhost-net kernel module.
+	// Windows: no IOMMU passthrough in QEMU (WHPX does not expose IOMMU).
+
+	return info, nil
+}
+
+func detectAccel() (AccelType, error) {
+	info, _ := detect()
+	return info.Accel, nil
 }

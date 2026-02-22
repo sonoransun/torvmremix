@@ -55,7 +55,9 @@ func main() {
 
 	cfg.Verbose = *verboseFlag
 
-	// Detect or set acceleration.
+	// Detect platform capabilities.
+	platInfo, _ := platform.Detect()
+
 	if *accelFlag != "" {
 		accel, err := platform.ParseAccel(*accelFlag)
 		if err != nil {
@@ -64,9 +66,12 @@ func main() {
 		}
 		cfg.Accel = string(accel)
 	} else {
-		info, _ := platform.DetectAccel()
-		cfg.Accel = string(info.Accel)
+		cfg.Accel = string(platInfo.Accel)
 	}
+
+	// Propagate runtime-detected capabilities to config.
+	cfg.VhostNet = platInfo.VhostNet
+	cfg.IOMMUEnabled = platInfo.IOMMUSupport
 
 	logger, err := logging.NewLogger(logging.Options{
 		Verbose: cfg.Verbose,

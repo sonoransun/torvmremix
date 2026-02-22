@@ -33,12 +33,14 @@ func (a *App) statusTab() fyne.CanvasObject {
 	buttonRow := container.NewHBox(startBtn, stopBtn)
 
 	accelLabel := widget.NewLabel("Acceleration: " + a.cfg.Accel)
+	cpuLabel := widget.NewLabel("VM CPUs: " + strconv.Itoa(a.cfg.VMCPUs))
 	memLabel := widget.NewLabel("VM Memory: " + strconv.Itoa(a.cfg.VMMemoryMB) + " MB")
 	hostIPLabel := widget.NewLabel("Host IP: " + a.cfg.HostIP)
 	vmIPLabel := widget.NewLabel("VM IP: " + a.cfg.VMIP)
 
 	info := container.NewVBox(
 		accelLabel,
+		cpuLabel,
 		memLabel,
 		hostIPLabel,
 		vmIPLabel,

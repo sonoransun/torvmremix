@@ -26,6 +26,15 @@ func (a *App) settingsTab() fyne.CanvasObject {
 		memLabel.SetText("VM Memory: " + strconv.Itoa(int(v)) + " MB")
 	}
 
+	cpuSlider := widget.NewSlider(1, 8)
+	cpuSlider.Step = 1
+	cpuSlider.Value = float64(a.cfg.VMCPUs)
+	cpuLabel := widget.NewLabel("VM CPUs: " + strconv.Itoa(a.cfg.VMCPUs))
+	cpuSlider.OnChanged = func(v float64) {
+		a.cfg.VMCPUs = int(v)
+		cpuLabel.SetText("VM CPUs: " + strconv.Itoa(int(v)))
+	}
+
 	socksEntry := widget.NewEntry()
 	socksEntry.SetText(strconv.Itoa(a.cfg.SOCKSPort))
 	socksEntry.OnChanged = func(s string) {
@@ -51,6 +60,9 @@ func (a *App) settingsTab() fyne.CanvasObject {
 		widget.NewSeparator(),
 		memLabel,
 		memSlider,
+		widget.NewSeparator(),
+		cpuLabel,
+		cpuSlider,
 		widget.NewSeparator(),
 		widget.NewLabel("SOCKS Port:"),
 		socksEntry,

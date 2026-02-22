@@ -43,6 +43,7 @@ type Config struct {
 	TransPort     int    `json:"trans_port"`
 	DNSPort       int    `json:"dns_port"`
 	VMMemoryMB    int    `json:"vm_memory_mb"`
+	VMCPUs        int    `json:"vm_cpus"`
 	KernelPath    string `json:"kernel_path"`
 	InitrdPath    string `json:"initrd_path"`
 	StateDiskPath string `json:"state_disk_path"`
@@ -50,6 +51,11 @@ type Config struct {
 	Verbose       bool   `json:"verbose"`
 	Accel         string `json:"accel"`
 	Headless      bool   `json:"headless"`
+
+	// Runtime-detected platform capabilities (not persisted).
+	VhostNet     bool `json:"-"`
+	IOMMUEnabled bool `json:"-"`
+
 	Bridge        BridgeConfig  `json:"bridge"`
 	Proxy         ProxyConfig   `json:"proxy"`
 	Service       ServiceConfig `json:"service"`
@@ -74,6 +80,7 @@ func DefaultConfig() *Config {
 		TransPort:     9095,
 		DNSPort:       9093,
 		VMMemoryMB:    128,
+		VMCPUs:        2,
 		KernelPath:    filepath.Join("dist", "vm", "vmlinuz"),
 		InitrdPath:    filepath.Join("dist", "vm", "initramfs.gz"),
 		StateDiskPath: filepath.Join("dist", "vm", "state.img"),
@@ -145,6 +152,11 @@ func (c *Config) Validate() error {
 	// Validate VM memory.
 	if c.VMMemoryMB < 32 || c.VMMemoryMB > 4096 {
 		return fmt.Errorf("VMMemoryMB must be 32-4096, got %d", c.VMMemoryMB)
+	}
+
+	// Validate VM CPUs.
+	if c.VMCPUs < 1 || c.VMCPUs > 16 {
+		return fmt.Errorf("VMCPUs must be 1-16, got %d", c.VMCPUs)
 	}
 
 	// Required paths must be non-empty.
