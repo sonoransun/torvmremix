@@ -9,10 +9,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.Socket
-import kotlin.random.Random
+import java.security.SecureRandom
 
 /**
  * Unique key identifying a TCP connection (4-tuple).
@@ -61,11 +63,13 @@ class TcpSession(
     private val tunWriter: TunWriter,
     private val protector: ((Socket) -> Boolean)?
 ) {
+    private val mutex = Mutex()
+
     var state: TcpState = TcpState.LISTEN
         private set
 
     private var clientIsn: Long = 0
-    private var ourIsn: Long = Random.nextLong(0, 0xFFFFFFFFL)
+    private var ourIsn: Long = SecureRandom().nextLong().ushr(32) and 0xFFFFFFFFL
     private var clientSeq: Long = 0   // next expected sequence number from the client
     private var ourSeq: Long = ourIsn + 1  // next sequence number we will send
 
@@ -107,7 +111,7 @@ class TcpSession(
         ipHeader: IPv4Header,
         tcpHeader: TcpHeader,
         payload: ByteArray
-    ) {
+    ) = mutex.withLock {
         lastActivity = System.currentTimeMillis()
 
         when (state) {

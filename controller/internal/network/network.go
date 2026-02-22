@@ -35,6 +35,7 @@ type Manager interface {
 type SavedConfig struct {
 	Data     []byte
 	Platform string
+	HMAC     string // Hex-encoded HMAC for integrity verification.
 }
 
 func run(name string, args ...string) error {

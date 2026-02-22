@@ -40,6 +40,7 @@ class Socks5Client(
         const val ADDR_TYPE_DOMAIN: Byte = 0x03
 
         const val CONNECT_TIMEOUT_MS = 10_000
+        const val SO_TIMEOUT_MS = 120_000
     }
 
     /**
@@ -62,6 +63,7 @@ class Socks5Client(
             sendDomainConnectRequest(output, destHost, destPort)
             readConnectReply(input)
 
+            socket.soTimeout = SO_TIMEOUT_MS
             socket
         } catch (e: Socks5Exception) {
             socket.closeSilently()
@@ -94,6 +96,7 @@ class Socks5Client(
             sendIpv4ConnectRequest(output, destAddr, destPort)
             readConnectReply(input)
 
+            socket.soTimeout = SO_TIMEOUT_MS
             socket
         } catch (e: Socks5Exception) {
             socket.closeSilently()

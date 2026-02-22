@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.util.concurrent.Semaphore
 
 /**
  * Relays DNS queries to an external DNS resolver (typically Tor's DNSPort)
@@ -29,6 +30,7 @@ class DnsRelay(
     private val protector: ((DatagramSocket) -> Boolean)?
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val concurrencyLimit = Semaphore(MAX_CONCURRENT_QUERIES)
 
     companion object {
         /** Maximum size of a DNS UDP response. */
@@ -36,6 +38,9 @@ class DnsRelay(
 
         /** Socket timeout for upstream DNS queries. */
         private const val DNS_TIMEOUT_MS = 5000
+
+        /** Maximum number of concurrent DNS queries. */
+        private const val MAX_CONCURRENT_QUERIES = 32
 
         private const val TAG = "DnsRelay"
     }
@@ -71,6 +76,7 @@ class DnsRelay(
         payload: ByteArray
     ) {
         scope.launch {
+            if (!concurrencyLimit.tryAcquire()) return@launch
             try {
                 val dnsResponse = forwardDnsQuery(payload)
 
@@ -86,6 +92,8 @@ class DnsRelay(
             } catch (_: Exception) {
                 // Query failed (timeout, network error, etc.) -- drop silently.
                 // The application will retry or fall back to TCP DNS.
+            } finally {
+                concurrencyLimit.release()
             }
         }
     }
@@ -95,6 +103,8 @@ class DnsRelay(
      * response bytes.
      */
     private fun forwardDnsQuery(query: ByteArray): ByteArray {
+        require(query.size >= 2) { "DNS query too short to contain transaction ID" }
+
         val socket = DatagramSocket()
         try {
             protector?.invoke(socket)
@@ -106,6 +116,13 @@ class DnsRelay(
             val buffer = ByteArray(DNS_BUFFER_SIZE)
             val response = DatagramPacket(buffer, buffer.size)
             socket.receive(response)
+
+            // Validate that the DNS transaction ID in the response matches the query
+            if (response.length < 2 ||
+                buffer[0] != query[0] || buffer[1] != query[1]
+            ) {
+                throw IllegalStateException("DNS response transaction ID mismatch")
+            }
 
             return buffer.copyOf(response.length)
         } finally {

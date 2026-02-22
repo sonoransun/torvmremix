@@ -50,7 +50,7 @@ class TorVpnService : VpnService() {
     private var tcpSessionManager: TcpSessionManager? = null
     private var dnsRelay: DnsRelay? = null
     private var readJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -66,6 +66,7 @@ class TorVpnService : VpnService() {
     }
 
     private fun startVpn() {
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         scope.launch {
             try {
                 state.value = VpnState.CONNECTING
@@ -141,6 +142,7 @@ class TorVpnService : VpnService() {
             .setSession("TorVM")
             .addAddress(VPN_ADDRESS, 32)
             .addRoute(VPN_ROUTE, 0)
+            .addRoute("::", 0)
             .addDnsServer(config.dnsHost)
             .setMtu(VPN_MTU)
             .setBlocking(true)

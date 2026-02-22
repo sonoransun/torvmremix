@@ -130,8 +130,14 @@ vmr_fwdadd() {
     return "$FAIL"
   fi
   iptables -t nat -A $cli_prenat_tbl -i "$1" -p tcp -d "$2" -j ACCEPT >>"$LOG_TO" 2>&1
-  iptables -t nat -A $cli_prenat_tbl -i "$1" -p tcp -j REDIRECT --to $TOR_TRANSPORT >>"$LOG_TO" 2>&1
-  iptables -t nat -A $cli_prenat_tbl -i "$1" -p udp --dport 53 -j REDIRECT --to $TOR_DNSPORT >>"$LOG_TO" 2>&1
+  if ! iptables -t nat -A $cli_prenat_tbl -i "$1" -p tcp -j REDIRECT --to $TOR_TRANSPORT >>"$LOG_TO" 2>&1; then
+    vmr_log "CRITICAL: TCP REDIRECT rule failed for $1"
+    return "$FAIL"
+  fi
+  if ! iptables -t nat -A $cli_prenat_tbl -i "$1" -p udp --dport 53 -j REDIRECT --to $TOR_DNSPORT >>"$LOG_TO" 2>&1; then
+    vmr_log "CRITICAL: DNS REDIRECT rule failed for $1"
+    return "$FAIL"
+  fi
   iptables -t nat -A $cli_prenat_tbl -i "$1" -p udp -j DROP >>"$LOG_TO" 2>&1
   iptables -t filter -I $host_filt_tbl -i "$1" -p udp ! --dport $TOR_DNSPORT -j DROP >>"$LOG_TO" 2>&1
   iptables -t filter -I OUTPUT -o "$1" -j ACCEPT >>"$LOG_TO" 2>&1

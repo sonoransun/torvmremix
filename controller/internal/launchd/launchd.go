@@ -6,8 +6,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
+
+// safeValueRe matches values safe for interpolation into shell commands
+// passed through osascript. Only allows alphanumeric, forward slash, dot,
+// underscore, hyphen, and space.
+var safeValueRe = regexp.MustCompile(`^[a-zA-Z0-9/._\- ]+$`)
 
 const (
 	serviceLabel = "org.torproject.torvm"
@@ -80,6 +86,17 @@ func Install(runAtLoad bool) error {
 	}
 	tmp.Close()
 
+	// Validate all interpolated path values before building the command.
+	for _, pair := range []struct{ name, val string }{
+		{"logDir", logDir},
+		{"tmpPath", tmpPath},
+		{"plistPath", plistPath},
+	} {
+		if err := validateShellValue(pair.name, pair.val); err != nil {
+			return err
+		}
+	}
+
 	cmd := fmt.Sprintf(
 		"mkdir -p '%s' && cp '%s' '%s' && chmod 644 '%s' && launchctl load '%s'",
 		logDir, tmpPath, plistPath, plistPath, plistPath,
@@ -130,11 +147,31 @@ func ReadLog(lines int) (string, error) {
 	return string(out), nil
 }
 
+// escapeAppleScript escapes a string for safe embedding in an AppleScript
+// "do shell script" string literal. Backslashes must be escaped first,
+// then double quotes, to prevent injection.
+func escapeAppleScript(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	return s
+}
+
+// validateShellValue ensures a value is safe for interpolation into a shell
+// command executed via osascript privilege escalation.
+func validateShellValue(name, value string) error {
+	if !safeValueRe.MatchString(value) {
+		return fmt.Errorf("%s contains unsafe characters: %q", name, value)
+	}
+	return nil
+}
+
 // runPrivileged executes a shell command with admin privileges via osascript.
+// All interpolated values in the command must have been validated with
+// validateShellValue before being included in the command string.
 func runPrivileged(command string) error {
 	script := fmt.Sprintf(
 		`do shell script "%s" with administrator privileges`,
-		strings.ReplaceAll(command, `"`, `\"`),
+		escapeAppleScript(command),
 	)
 	cmd := exec.Command("osascript", "-e", script)
 	out, err := cmd.CombinedOutput()

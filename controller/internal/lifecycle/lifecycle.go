@@ -218,6 +218,8 @@ func (e *Engine) doWaitTAP(ctx context.Context) error {
 	// Wait up to 60 seconds for the TAP device to become connected.
 	timeout := 60 * time.Second
 	deadline := time.Now().Add(timeout)
+	backoff := 500 * time.Millisecond
+	const maxBackoff = 10 * time.Second
 
 	for time.Now().Before(deadline) {
 		if ctx.Err() != nil {
@@ -231,11 +233,21 @@ func (e *Engine) doWaitTAP(ctx context.Context) error {
 			fmt.Sprintf("%s:%d", e.Config.VMIP, e.Config.ControlPort),
 			2*time.Second)
 		if err == nil {
+			// Set linger to 0 to close immediately without TIME_WAIT,
+			// avoiding file descriptor exhaustion from probe connections.
+			if tc, ok := conn.(*net.TCPConn); ok {
+				tc.SetLinger(0)
+			}
 			conn.Close()
 			e.transition(StateConfigureTAP)
 			return nil
 		}
-		time.Sleep(time.Second)
+		time.Sleep(backoff)
+		// Exponential backoff capped at maxBackoff.
+		backoff = backoff * 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
 	}
 	return fmt.Errorf("TAP connect timeout after %v", timeout)
 }
@@ -264,6 +276,8 @@ func (e *Engine) doWaitBootstrap(ctx context.Context) error {
 	// Wait up to 5 minutes for Tor to bootstrap.
 	timeout := 5 * time.Minute
 	deadline := time.Now().Add(timeout)
+	backoff := time.Second
+	const maxBackoff = 10 * time.Second
 
 	for time.Now().Before(deadline) {
 		if ctx.Err() != nil {
@@ -277,12 +291,22 @@ func (e *Engine) doWaitBootstrap(ctx context.Context) error {
 			fmt.Sprintf("%s:%d", e.Config.VMIP, e.Config.SOCKSPort),
 			2*time.Second)
 		if err == nil {
+			// Set linger to 0 to close immediately without TIME_WAIT,
+			// avoiding file descriptor exhaustion from probe connections.
+			if tc, ok := conn.(*net.TCPConn); ok {
+				tc.SetLinger(0)
+			}
 			conn.Close()
 			e.Logger.Info("Tor SOCKS port is reachable, bootstrap likely complete")
 			e.transition(StateRunning)
 			return nil
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(backoff)
+		// Exponential backoff capped at maxBackoff.
+		backoff = backoff * 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
 	}
 	return fmt.Errorf("Tor bootstrap timeout after %v", timeout)
 }
@@ -315,7 +339,13 @@ func (e *Engine) doShutdown(ctx context.Context) error {
 }
 
 func (e *Engine) doRestoreNetwork() error {
-	e.Network.TeardownRouting()
+	if err := e.Network.TeardownRouting(); err != nil {
+		e.Logger.Error("teardown routing failed: %v", err)
+		// Activate failsafe to block unprotected traffic if routing
+		// teardown fails, since traffic may still be flowing without
+		// Tor protection.
+		e.FailSafe.Activate()
+	}
 
 	if e.savedNet != nil {
 		if err := e.Network.RestoreConfig(e.savedNet); err != nil {

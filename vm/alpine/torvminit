@@ -9,6 +9,8 @@ dn () {
 echo -n "    ${1}"
 }
 
+umask 077
+
 . /sbin/vmrouter.sh
 
 mount -t proc proc /proc
@@ -37,6 +39,16 @@ get_param_safe() {
 }
 has_param() {
   echo "$ARGS" | grep " ${1}" >/dev/null 2>&1
+}
+valid_ipv4() {
+  echo "$1" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$' || return 1
+  IFS='.' read -r a b c dd <<EOF
+$1
+EOF
+  [ "$a" -le 255 ] && [ "$b" -le 255 ] && [ "$c" -le 255 ] && [ "$dd" -le 255 ] 2>/dev/null
+}
+valid_mac() {
+  echo "$1" | grep -qE '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'
 }
 
 clear;echo
@@ -92,7 +104,7 @@ fi
 # seed from virtio-rng hardware RNG if available (provided by host via
 # virtio-rng-pci device). This is the highest quality entropy source.
 if [ -c /dev/hwrng ]; then
-  head -c 2048 /dev/hwrng > /dev/urandom 2>/dev/null
+  timeout 5 head -c 2048 /dev/hwrng > /dev/urandom 2>/dev/null
   d "Seeded entropy from hardware RNG (virtio-rng)"
 fi
 # also seed from sha1 of full cmdline
@@ -127,12 +139,12 @@ fi
 
 # parse CTLSOCK and HASHPW for Tor control
 if has_param 'CTLSOCK='; then
-  CTLADDR=$(get_param CTLSOCK)
-  CTLIP=$(echo "$CTLADDR" | sed 's/:.*//')
-  CTLPORT=$(echo "$CTLADDR" | sed 's/.*://')
+  CTLADDR=$(get_param_safe CTLSOCK '0-9.:')
+  CTLIP=$(echo "$CTLADDR" | sed 's/:.*//' | sed 's/[^0-9.]//g')
+  CTLPORT=$(echo "$CTLADDR" | sed 's/.*://' | sed 's/[^0-9]//g')
 fi
 if has_param 'HASHPW='; then
-  HASHPW=$(get_param HASHPW)
+  HASHPW=$(get_param_safe HASHPW '0-9a-fA-F:')
 fi
 
 if has_param 'DEBUGINIT '; then
@@ -148,6 +160,10 @@ if has_param 'IP='; then
   export GW=$(get_param_safe GW '0-9.')
   export MAC=$(get_param_safe MAC '0-9a-fA-F:.')
   MTU=$(get_param_safe MTU '0-9')
+  if ! valid_ipv4 "$IP" || ! valid_ipv4 "$GW"; then
+    d "ERROR: Invalid IP ($IP) or GW ($GW) address."
+    netup=0
+  else
   dn "Setting IP $IP / $MASK via $GW ..."
   ip link set eth0 address "$MAC"
   ip addr add "${IP}/$(mask2cidr "$MASK" 2>/dev/null || echo "$MASK")" dev eth0
@@ -159,6 +175,7 @@ if has_param 'IP='; then
     vmr_fwdadd "$PRIVINTF" "$PRIVIP"
   fi
   netup=1
+  fi
 else
   # dhcp for address
   MAC=$(get_param_safe MAC '0-9a-fA-F:.')
@@ -198,27 +215,39 @@ if [ $netup -eq 0 ]; then
   d "Check your DHCP server or configure one manually."
   d "Remember to start Tor via /etc/init.d/tor start when ready."
 else
-  # set any static ARP entries AFTER DHCP / interface up
-  done=0
+  # set any static ARP entries AFTER DHCP / interface up (max 4)
   cidx=1
-  while [ $done -eq 0 ]; do
+  while [ $cidx -le 4 ]; do
     if has_param "ARPENT${cidx}"; then
-      CENT=$(echo $ARGS | sed "s/.* ARPENT${cidx}=//" | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.-]//g')
-      CMAC=$(echo $CENT | sed 's/-.*//')
-      CIP=$(echo $CENT | sed 's/.*-//')
-      vmr_setarp eth0 $CIP $CMAC
-      cidx=$(expr $cidx + 1)
-    else
-      done=1
+      CENT=$(echo "$ARGS" | sed "s/.* ARPENT${cidx}=//" | sed 's/ .*//' | sed 's/[^0-9a-fA-F:.-]//g')
+      CMAC=$(echo "$CENT" | sed 's/-.*//')
+      CIP=$(echo "$CENT" | sed 's/.*-//')
+      if valid_mac "$CMAC" && valid_ipv4 "$CIP"; then
+        vmr_setarp eth0 "$CIP" "$CMAC"
+      else
+        d "WARNING: Skipping invalid ARP entry ${cidx}: MAC=$CMAC IP=$CIP"
+      fi
     fi
+    cidx=$(expr $cidx + 1)
   done
 
   echo " done.";echo
 
-  # Apply torrc overlay from state disk if present.
+  # Apply torrc overlay from state disk if present (whitelist allowed directives).
   if [ -f /home/torrc.override ]; then
     d "Applying torrc override ..."
-    cat /home/torrc.override >> /etc/tor/torrc
+    TORRC_ALLOWED="^(Bridge|UseBridges|ClientTransportPlugin|FascistFirewall|ReachableAddresses|ReachableDirAddresses|ReachableORAddresses|HTTPSProxy|HTTPSProxyAuthenticator|Socks4Proxy|Socks5Proxy|Socks5ProxyUsername|Socks5ProxyPassword|ExcludeNodes|ExcludeExitNodes|ExitNodes|EntryNodes|StrictNodes|NumEntryGuards|CircuitBuildTimeout|LearnCircuitBuildTimeout|MaxCircuitDirtiness)[[:space:]]"
+    grep -E "$TORRC_ALLOWED" /home/torrc.override >> /etc/tor/torrc
+  fi
+
+  # Configure Tor control port if CTLSOCK was provided
+  if [ -n "$CTLIP" ] && [ -n "$CTLPORT" ]; then
+    echo "ControlPort ${CTLIP}:${CTLPORT}" >> /etc/tor/torrc
+    if [ -n "$HASHPW" ]; then
+      echo "HashedControlPassword ${HASHPW}" >> /etc/tor/torrc
+    else
+      echo "CookieAuthentication 1" >> /etc/tor/torrc
+    fi
   fi
 
   dn "Starting Tor ... "

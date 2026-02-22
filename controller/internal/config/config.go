@@ -6,9 +6,34 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
-	"strings"
 )
+
+// tapNameUnixRe matches valid Unix TAP interface names: starts with a letter,
+// followed by up to 14 alphanumeric characters.
+var tapNameUnixRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9]{0,14}$`)
+
+// tapNameWindowsRe matches valid Windows TAP adapter names: letters, digits,
+// spaces, and hyphens, up to 64 characters.
+var tapNameWindowsRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9 -]{0,63}$`)
+
+// validateTAPName checks that the TAP adapter name matches a strict whitelist.
+func validateTAPName(name string) error {
+	if name == "" {
+		return fmt.Errorf("TAPName must not be empty")
+	}
+	if runtime.GOOS == "windows" {
+		if !tapNameWindowsRe.MatchString(name) {
+			return fmt.Errorf("TAPName %q does not match allowed pattern (letters, digits, spaces, hyphens; max 64 chars)", name)
+		}
+	} else {
+		if !tapNameUnixRe.MatchString(name) {
+			return fmt.Errorf("TAPName %q does not match allowed pattern (letter followed by up to 14 alphanumeric chars)", name)
+		}
+	}
+	return nil
+}
 
 // BridgeConfig holds Tor bridge and pluggable transport settings.
 type BridgeConfig struct {
@@ -100,6 +125,21 @@ func Load(path string) (*Config, error) {
 		return cfg, nil
 	}
 
+	// Check file permissions before reading. Refuse world-writable or
+	// group-writable config files to prevent tampering.
+	if runtime.GOOS != "windows" {
+		fi, err := os.Stat(path)
+		if err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("stat config file: %w", err)
+		}
+		if err == nil {
+			perm := fi.Mode().Perm()
+			if perm&0022 != 0 {
+				return nil, fmt.Errorf("config file %s has insecure permissions %04o; must not be group-writable or world-writable (expected 0600 or 0644)", path, perm)
+			}
+		}
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -171,12 +211,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// TAPName must be non-empty and free of shell metacharacters.
-	if c.TAPName == "" {
-		return fmt.Errorf("TAPName must not be empty")
-	}
-	if strings.ContainsAny(c.TAPName, ";|&$`\\\"'<>(){}!\n\r") {
-		return fmt.Errorf("TAPName contains invalid characters: %q", c.TAPName)
+	// TAPName must match a strict whitelist pattern.
+	if err := validateTAPName(c.TAPName); err != nil {
+		return err
 	}
 
 	// Whitelist acceleration backends.

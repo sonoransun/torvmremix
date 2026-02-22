@@ -38,6 +38,9 @@ class TcpSessionManager(
     private var cleanupJob: Job? = null
 
     companion object {
+        /** Maximum number of concurrent sessions. */
+        private const val MAX_SESSIONS = 1024
+
         /** Interval between cleanup sweeps. */
         private const val CLEANUP_INTERVAL_MS = 30_000L
 
@@ -46,6 +49,9 @@ class TcpSessionManager(
 
         /** Sessions with no activity for this long are forcefully closed. */
         private const val IDLE_TIMEOUT_MS = 300_000L  // 5 minutes
+
+        /** SYN_RECEIVED sessions are reaped after this duration. */
+        private const val SYN_RECEIVED_TIMEOUT_MS = 10_000L
 
         private const val TAG = "TcpSessionManager"
     }
@@ -95,6 +101,12 @@ class TcpSessionManager(
         )
 
         if (tcpHeader.isSyn && !tcpHeader.isAck) {
+            // Enforce session limit to prevent SYN flood exhaustion
+            if (sessions.size >= MAX_SESSIONS) {
+                sendRst(ipHeader, tcpHeader)
+                return
+            }
+
             // New connection -- remove any stale session with the same key
             sessions.remove(key)?.close()
 
@@ -154,6 +166,7 @@ class TcpSessionManager(
             val shouldRemove = when (session.state) {
                 TcpState.CLOSED -> true
                 TcpState.TIME_WAIT -> elapsed > TIME_WAIT_TIMEOUT_MS
+                TcpState.SYN_RECEIVED -> elapsed > SYN_RECEIVED_TIMEOUT_MS
                 else -> elapsed > IDLE_TIMEOUT_MS
             }
 

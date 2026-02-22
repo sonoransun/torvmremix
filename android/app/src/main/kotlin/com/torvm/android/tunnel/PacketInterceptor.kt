@@ -44,14 +44,16 @@ class PacketInterceptor(
     suspend fun intercept(packet: ByteArray, length: Int) {
         if (length < MIN_IP_HEADER_SIZE) return
 
+        // Check IP version nibble before attempting to parse
+        val version = (packet[0].toInt() shr 4) and 0x0F
+        if (version != 4) return
+
         val ipHeader: IPv4Header
         try {
             ipHeader = IPv4Header.parse(packet)
         } catch (_: IllegalArgumentException) {
-            return  // Malformed or non-IPv4 -- drop
+            return  // Malformed -- drop
         }
-
-        if (ipHeader.version != 4) return
 
         val transportOffset = ipHeader.headerLength
 

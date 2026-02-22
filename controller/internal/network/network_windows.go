@@ -5,6 +5,10 @@ package network
 import (
 	"bufio"
 	"bytes"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
@@ -14,14 +18,31 @@ import (
 )
 
 type windowsManager struct {
-	stateDir string
+	stateDir   string
+	sessionKey []byte // Session-derived key for HMAC integrity of saved config.
 }
 
 // NewManager returns a Windows network manager.
 // Ported from torvm.c: configtap(), savenetconfig(), restorenetconfig().
 func NewManager() Manager {
+	// Derive state directory from the executable's location to avoid
+	// relying on the working directory, which could be attacker-controlled.
+	stateDir := filepath.Join(".", "state") // fallback
+	if exe, err := os.Executable(); err == nil {
+		stateDir = filepath.Join(filepath.Dir(exe), "state")
+	}
+
+	// Generate a session-specific key for HMAC integrity of saved config.
+	sessionKey := make([]byte, 32)
+	if _, err := rand.Read(sessionKey); err != nil {
+		// If we can't get random bytes, proceed without integrity checking.
+		// This is a degraded mode that still works but logs a warning.
+		sessionKey = nil
+	}
+
 	return &windowsManager{
-		stateDir: filepath.Join(".", "state"),
+		stateDir:   stateDir,
+		sessionKey: sessionKey,
 	}
 }
 
@@ -75,6 +96,32 @@ func validateNetshDump(data []byte) error {
 	return scanner.Err()
 }
 
+// computeHMAC returns a hex-encoded HMAC-SHA256 of the given data.
+func (m *windowsManager) computeHMAC(data []byte) string {
+	if m.sessionKey == nil {
+		return ""
+	}
+	mac := hmac.New(sha256.New, m.sessionKey)
+	mac.Write(data)
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// verifyHMAC checks the HMAC of the given data against the expected value.
+func (m *windowsManager) verifyHMAC(data []byte, expected string) error {
+	if m.sessionKey == nil {
+		// No session key available; skip integrity check.
+		return nil
+	}
+	if expected == "" {
+		return fmt.Errorf("saved config has no HMAC; integrity cannot be verified")
+	}
+	computed := m.computeHMAC(data)
+	if !hmac.Equal([]byte(computed), []byte(expected)) {
+		return fmt.Errorf("saved config HMAC mismatch; data may have been tampered with")
+	}
+	return nil
+}
+
 func (m *windowsManager) SaveConfig() (*SavedConfig, error) {
 	// Capture current IP configuration via netsh, matching legacy savenetconfig().
 	out, err := exec.Command("netsh", "interface", "ip", "dump").Output()
@@ -91,12 +138,21 @@ func (m *windowsManager) SaveConfig() (*SavedConfig, error) {
 		return nil, fmt.Errorf("write netcfg save: %w", err)
 	}
 
-	return &SavedConfig{Data: out, Platform: "windows"}, nil
+	return &SavedConfig{
+		Data:     out,
+		Platform: "windows",
+		HMAC:     m.computeHMAC(out),
+	}, nil
 }
 
 func (m *windowsManager) RestoreConfig(cfg *SavedConfig) error {
 	if cfg == nil || cfg.Platform != "windows" {
 		return fmt.Errorf("invalid saved config for windows")
+	}
+
+	// Verify HMAC integrity before restoring.
+	if err := m.verifyHMAC(cfg.Data, cfg.HMAC); err != nil {
+		return fmt.Errorf("saved config integrity check failed: %w", err)
 	}
 
 	// Validate the saved dump before executing it.
