@@ -10,6 +10,7 @@ import (
 
 	"github.com/user/extorvm/controller/gui"
 	"github.com/user/extorvm/controller/internal/config"
+	"github.com/user/extorvm/controller/internal/launchd"
 	"github.com/user/extorvm/controller/internal/lifecycle"
 	"github.com/user/extorvm/controller/internal/logging"
 	"github.com/user/extorvm/controller/internal/platform"
@@ -17,14 +18,34 @@ import (
 
 func main() {
 	var (
-		accelFlag   = flag.String("accel", "", "acceleration backend: kvm, hvf, whpx, tcg")
-		verboseFlag = flag.Bool("verbose", false, "enable debug logging")
-		headless    = flag.Bool("headless", false, "run without GUI")
-		configFile  = flag.String("config", "", "path to JSON config file")
-		clean       = flag.Bool("clean", false, "remove state disk before starting")
-		replace     = flag.Bool("replace", false, "replace existing state disk with fresh copy")
+		accelFlag      = flag.String("accel", "", "acceleration backend: kvm, hvf, whpx, tcg")
+		verboseFlag    = flag.Bool("verbose", false, "enable debug logging")
+		headless       = flag.Bool("headless", false, "run without GUI")
+		configFile     = flag.String("config", "", "path to JSON config file")
+		clean          = flag.Bool("clean", false, "remove state disk before starting")
+		replace        = flag.Bool("replace", false, "replace existing state disk with fresh copy")
+		serviceInstall = flag.Bool("service-install", false, "install as macOS launchd service and exit")
+		serviceUninstall = flag.Bool("service-uninstall", false, "uninstall macOS launchd service and exit")
 	)
 	flag.Parse()
+
+	// Handle service install/uninstall commands and exit.
+	if *serviceInstall {
+		if err := launchd.Install(false); err != nil {
+			fmt.Fprintf(os.Stderr, "error: service install: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("TorVM service installed.")
+		return
+	}
+	if *serviceUninstall {
+		if err := launchd.Uninstall(); err != nil {
+			fmt.Fprintf(os.Stderr, "error: service uninstall: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("TorVM service uninstalled.")
+		return
+	}
 
 	cfg, err := config.Load(*configFile)
 	if err != nil {

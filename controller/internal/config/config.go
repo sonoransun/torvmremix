@@ -25,6 +25,11 @@ type ProxyConfig struct {
 	Password string `json:"password"`
 }
 
+// ServiceConfig holds launchd service settings (macOS).
+type ServiceConfig struct {
+	RunAtLoad bool `json:"run_at_load"`
+}
+
 // Config holds all configuration for the TorVM controller.
 type Config struct {
 	TAPName       string `json:"tap_name"`
@@ -45,8 +50,9 @@ type Config struct {
 	Verbose       bool   `json:"verbose"`
 	Accel         string `json:"accel"`
 	Headless      bool   `json:"headless"`
-	Bridge        BridgeConfig `json:"bridge"`
-	Proxy         ProxyConfig  `json:"proxy"`
+	Bridge        BridgeConfig  `json:"bridge"`
+	Proxy         ProxyConfig   `json:"proxy"`
+	Service       ServiceConfig `json:"service"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.

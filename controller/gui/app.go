@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"time"
 
 	fyneapp "fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
@@ -11,6 +12,7 @@ import (
 	"fyne.io/fyne/v2"
 
 	"github.com/user/extorvm/controller/internal/config"
+	"github.com/user/extorvm/controller/internal/launchd"
 	"github.com/user/extorvm/controller/internal/lifecycle"
 	"github.com/user/extorvm/controller/internal/logging"
 )
@@ -24,13 +26,16 @@ type App struct {
 	ring    *logging.RingWriter
 	cfg     *config.Config
 
-	configPath string
-	cancel     context.CancelFunc
+	configPath    string
+	cancel        context.CancelFunc
+	serviceMode   bool
+	serviceTicker *time.Ticker
 
 	// Widgets updated by observers.
 	statusLight *StatusLight
 	stateLabel  *widget.Label
 	logView     *LogView
+	modeLabel   *widget.Label
 }
 
 // New creates a GUI application.
@@ -50,9 +55,14 @@ func (a *App) Run() {
 	a.window = a.fyneApp.NewWindow("TorVM")
 	a.window.Resize(fyne.NewSize(640, 480))
 
+	// Auto-detect service mode: if service is installed, default to service mode.
+	st := launchd.QueryStatus()
+	a.serviceMode = st.Installed
+
 	// Register lifecycle observer for UI updates.
 	a.engine.OnStateChange(func(from, to lifecycle.State) {
 		a.updateStatus(from, to)
+		a.refreshTrayMenu()
 	})
 
 	tabs := container.NewAppTabs(
@@ -63,19 +73,33 @@ func (a *App) Run() {
 		container.NewTabItem("Logs", a.logTab()),
 	)
 
+	// Conditionally add Service tab (macOS only — returns nil on other platforms).
+	if svcTab := a.serviceTab(); svcTab != nil {
+		tabs.Append(container.NewTabItem("Service", svcTab))
+	}
+
 	a.window.SetContent(tabs)
 
-	a.window.SetOnClosed(func() {
-		if a.cancel != nil {
-			a.cancel()
-		}
+	// Minimize to tray on close instead of quitting.
+	a.window.SetCloseIntercept(func() {
+		a.window.Hide()
 	})
 
+	a.setupSystemTray()
 	a.window.ShowAndRun()
 }
 
-// startVM begins the lifecycle engine in the background.
+// startVM begins the lifecycle engine in the background,
+// or starts the launchd service if in service mode.
 func (a *App) startVM() {
+	if a.serviceMode {
+		if err := launchd.Start(); err != nil {
+			a.logger.Error("service start: %v", err)
+			dialog.ShowError(err, a.window)
+		}
+		return
+	}
+
 	if a.cancel != nil {
 		// Already running.
 		return
@@ -89,6 +113,7 @@ func (a *App) startVM() {
 	go func() {
 		err := <-errCh
 		a.cancel = nil
+		a.refreshTrayMenu()
 		if err != nil {
 			a.logger.Error("lifecycle error: %v", err)
 			a.window.Canvas().Content().Refresh()
@@ -97,8 +122,17 @@ func (a *App) startVM() {
 	}()
 }
 
-// stopVM signals the lifecycle engine to shut down.
+// stopVM signals the lifecycle engine to shut down,
+// or stops the launchd service if in service mode.
 func (a *App) stopVM() {
+	if a.serviceMode {
+		if err := launchd.Stop(); err != nil {
+			a.logger.Error("service stop: %v", err)
+			dialog.ShowError(err, a.window)
+		}
+		return
+	}
+
 	if a.cancel != nil {
 		a.cancel()
 		a.cancel = nil

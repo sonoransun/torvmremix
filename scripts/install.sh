@@ -36,4 +36,14 @@ if [ -f "$PROJECT_ROOT/dist/vm/state.img" ]; then
   sudo install -m 644 "$PROJECT_ROOT/dist/vm/state.img" "$VM_DIR/"
 fi
 
+# macOS: install launchd plist and create log directory.
+if [ "$OS" = "darwin" ]; then
+  echo "  launchd plist: /Library/LaunchDaemons/org.torproject.torvm.plist"
+  sudo cp "$PROJECT_ROOT/installer/macos/torvm.plist" /Library/LaunchDaemons/org.torproject.torvm.plist
+  sudo chmod 644 /Library/LaunchDaemons/org.torproject.torvm.plist
+
+  echo "  Log directory: /var/log/torvm/"
+  sudo mkdir -p /var/log/torvm
+fi
+
 echo "Installation complete."
