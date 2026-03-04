@@ -95,6 +95,18 @@ func (l *Logger) AddWriter(w io.Writer) {
 	l.writers = append(l.writers, w)
 }
 
+// SetVerbose changes the log level at runtime. When verbose is true,
+// debug messages are included; otherwise only info and error are logged.
+func (l *Logger) SetVerbose(verbose bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if verbose {
+		l.level = LevelDebug
+	} else {
+		l.level = LevelInfo
+	}
+}
+
 // Error logs at ERROR level.
 func (l *Logger) Error(format string, args ...any) {
 	l.log(LevelError, format, args...)

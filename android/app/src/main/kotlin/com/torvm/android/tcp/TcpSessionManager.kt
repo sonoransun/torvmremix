@@ -29,7 +29,13 @@ class TcpSessionManager(
     private val socksHost: String,
     private val socksPort: Int,
     private val tunWriter: TunWriter,
-    private val protector: ((Socket) -> Boolean)?
+    private val protector: ((Socket) -> Boolean)?,
+    /**
+     * Optional isolation key provider. When set, maps a destination address
+     * to a SOCKS5 username/password pair for per-app circuit isolation.
+     * Tor creates separate circuits for different credential combos.
+     */
+    private val isolationKeyProvider: ((SessionKey) -> Pair<String, String>?)? = null
 ) {
     private val sessions = ConcurrentHashMap<SessionKey, TcpSession>()
     private val scope = CoroutineScope(
@@ -110,7 +116,12 @@ class TcpSessionManager(
             // New connection -- remove any stale session with the same key
             sessions.remove(key)?.close()
 
-            val session = TcpSession(key, socksHost, socksPort, tunWriter, protector)
+            val isolation = isolationKeyProvider?.invoke(key)
+            val session = TcpSession(
+                key, socksHost, socksPort, tunWriter, protector,
+                isolationUsername = isolation?.first,
+                isolationPassword = isolation?.second
+            )
             sessions[key] = session
             session.handlePacket(ipHeader, tcpHeader, payload)
         } else {

@@ -1,6 +1,10 @@
 package network
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os/exec"
@@ -42,6 +46,43 @@ func run(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%s %v: %s: %w", name, args, string(out), err)
+	}
+	return nil
+}
+
+// newSessionKey generates a 32-byte random key for HMAC integrity verification
+// of saved network configs. Returns nil if random bytes are unavailable.
+func newSessionKey() []byte {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil
+	}
+	return key
+}
+
+// computeHMAC returns a hex-encoded HMAC-SHA256 of the given data using the
+// provided session key. Returns "" if key is nil.
+func computeHMAC(key, data []byte) string {
+	if key == nil {
+		return ""
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write(data)
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// verifyHMAC checks the HMAC of the given data against the expected hex string.
+// Returns nil if the key is nil (degraded mode) or if the HMAC matches.
+func verifyHMAC(key, data []byte, expected string) error {
+	if key == nil {
+		return nil
+	}
+	if expected == "" {
+		return fmt.Errorf("saved config has no HMAC; integrity cannot be verified")
+	}
+	computed := computeHMAC(key, data)
+	if !hmac.Equal([]byte(computed), []byte(expected)) {
+		return fmt.Errorf("saved config HMAC mismatch; data may have been tampered with")
 	}
 	return nil
 }

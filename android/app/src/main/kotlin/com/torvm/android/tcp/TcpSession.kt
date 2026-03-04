@@ -61,7 +61,9 @@ class TcpSession(
     private val socksHost: String,
     private val socksPort: Int,
     private val tunWriter: TunWriter,
-    private val protector: ((Socket) -> Boolean)?
+    private val protector: ((Socket) -> Boolean)?,
+    private val isolationUsername: String? = null,
+    private val isolationPassword: String? = null
 ) {
     private val mutex = Mutex()
 
@@ -87,11 +89,14 @@ class TcpSession(
     val isClosed: Boolean
         get() = state == TcpState.CLOSED
 
+    /** Congestion controller for this session. */
+    val congestion = CongestionController()
+
     companion object {
         /** Maximum segment size for data sent back to the client. */
         const val MSS = 1400
 
-        /** Advertised receive window. */
+        /** Maximum advertised receive window. */
         const val WINDOW_SIZE = 65535
 
         private const val TAG = "TcpSession"
@@ -141,7 +146,10 @@ class TcpSession(
                     tcpHeader.isRst -> close()
                     tcpHeader.isFin -> handleFin(tcpHeader)
                     payload.isNotEmpty() -> handleEstablishedData(tcpHeader, payload)
-                    // Pure ACK with no data -- nothing to do
+                    tcpHeader.isAck -> {
+                        // Pure ACK -- update congestion controller
+                        congestion.onAck(0)
+                    }
                 }
             }
 
@@ -279,9 +287,12 @@ class TcpSession(
             seqNum = seqOverride ?: ourSeq,
             ackNum = clientSeq,
             flags = flags,
-            window = WINDOW_SIZE,
+            window = congestion.getWindowSize(),
             payload = payload
         )
+        if (payload.isNotEmpty()) {
+            congestion.onSend(payload.size)
+        }
         tunWriter.write(packet)
     }
 
@@ -293,6 +304,8 @@ class TcpSession(
         try {
             val client = Socks5Client(socksHost, socksPort)
             client.protector = protector
+            client.authUsername = isolationUsername
+            client.authPassword = isolationPassword
             val socket = client.connect(key.dstAddr, key.dstPort)
 
             upstreamSocket = socket

@@ -11,6 +11,7 @@ import com.torvm.android.R
 import com.torvm.android.data.ConnectionConfig
 import com.torvm.android.data.PreferencesRepository
 import com.torvm.android.dns.DnsRelay
+import com.torvm.android.firewall.AppFirewall
 import com.torvm.android.tcp.TcpSessionManager
 import com.torvm.android.tunnel.PacketInterceptor
 import com.torvm.android.tunnel.TunReader
@@ -138,7 +139,7 @@ class TorVpnService : VpnService() {
     }
 
     private fun createVpnInterface(config: ConnectionConfig): ParcelFileDescriptor {
-        return Builder()
+        val builder = Builder()
             .setSession("TorVM")
             .addAddress(VPN_ADDRESS, 32)
             .addRoute(VPN_ROUTE, 0)
@@ -146,7 +147,34 @@ class TorVpnService : VpnService() {
             .addDnsServer(config.dnsHost)
             .setMtu(VPN_MTU)
             .setBlocking(true)
-            .establish() ?: throw IllegalStateException("VPN interface creation failed")
+
+        // Apply per-app firewall rules.
+        val firewall = AppFirewall(applicationContext)
+        when (firewall.mode) {
+            AppFirewall.Mode.ALLOW_ALL -> {
+                // No per-app filtering; all apps route through TorVM.
+            }
+            AppFirewall.Mode.ALLOW_LIST -> {
+                for (pkg in firewall.appList) {
+                    try {
+                        builder.addAllowedApplication(pkg)
+                    } catch (_: Exception) {
+                        // Package not installed; skip.
+                    }
+                }
+            }
+            AppFirewall.Mode.BLOCK_LIST -> {
+                for (pkg in firewall.appList) {
+                    try {
+                        builder.addDisallowedApplication(pkg)
+                    } catch (_: Exception) {
+                        // Package not installed; skip.
+                    }
+                }
+            }
+        }
+
+        return builder.establish() ?: throw IllegalStateException("VPN interface creation failed")
     }
 
     private suspend fun loadConfig(): ConnectionConfig {

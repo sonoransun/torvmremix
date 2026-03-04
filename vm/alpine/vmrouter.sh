@@ -117,7 +117,7 @@ vmr_fwdsetup() {
   done
   iptables -t nat -I $cli_postnat_tbl -o "$1" -j MASQUERADE >>"$LOG_TO" 2>&1
   iptables -t filter -I $host_filt_tbl -i "$1" -m state --state ESTABLISHED,RELATED -j ACCEPT >>"$LOG_TO" 2>&1
-  iptables -t filter -I OUTPUT -o "$1" -j ACCEPT >>"$LOG_TO" 2>&1
+  iptables -t filter -I OUTPUT -o "$1" -m owner --uid-owner 52 -j ACCEPT >>"$LOG_TO" 2>&1
   # reset the trap target at top of chain
   iptables -t filter -D OUTPUT -j $trap_tbl >>"$LOG_TO" 2>&1
   iptables -t filter -I OUTPUT -j $trap_tbl >>"$LOG_TO" 2>&1
@@ -156,7 +156,7 @@ vmr_fwddel() {
   iptables -t nat -D $cli_prenat_tbl -i "$1" -p tcp -j REDIRECT --to $TOR_TRANSPORT >>"$LOG_TO" 2>&1
   iptables -t nat -D $cli_prenat_tbl -i "$1" -p udp --dport 53 -j REDIRECT --to $TOR_DNSPORT >>"$LOG_TO" 2>&1
   iptables -t nat -D $cli_prenat_tbl -i "$1" -p udp -j DROP >>"$LOG_TO" 2>&1
-  iptables -t filter -D OUTPUT -o "$1" -j ACCEPT >>"$LOG_TO" 2>&1
+  iptables -t filter -D OUTPUT -o "$1" -m owner --uid-owner 52 -j ACCEPT >>"$LOG_TO" 2>&1
 }
 
 vmr_opendhcp() {

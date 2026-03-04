@@ -13,6 +13,12 @@ AutomapHostsSuffixes .onion
 AutomapHostsOnResolve 1
 
 # options appended from command line placed below:
-SocksPort 0.0.0.0:9050
-DNSPort 0.0.0.0:9093
-TransPort 0.0.0.0:9095
+SocksPort 10.10.10.1:9050
+DNSPort 10.10.10.1:9093
+TransPort 10.10.10.1:9095
+
+# Security hardening
+SafeSocks 1
+ClientRejectInternalAddresses 1
+EnforceDistinctSubnets 1
+WarnPlaintextPorts 23,109,110,143

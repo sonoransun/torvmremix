@@ -50,6 +50,12 @@ type ProxyConfig struct {
 	Password string `json:"password"`
 }
 
+// RetryConfig holds retry/recovery settings for lifecycle state transitions.
+type RetryConfig struct {
+	Enabled     bool `json:"retry_enabled"`
+	MaxAttempts int  `json:"retry_max_attempts"`
+}
+
 // ServiceConfig holds launchd service settings (macOS).
 type ServiceConfig struct {
 	RunAtLoad bool `json:"run_at_load"`
@@ -84,6 +90,7 @@ type Config struct {
 	Bridge        BridgeConfig  `json:"bridge"`
 	Proxy         ProxyConfig   `json:"proxy"`
 	Service       ServiceConfig `json:"service"`
+	Retry         RetryConfig   `json:"retry"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -112,6 +119,10 @@ func DefaultConfig() *Config {
 		QMPSocketPath: defaultQMPPath(),
 		Verbose:       false,
 		Accel:         "",
+		Retry: RetryConfig{
+			Enabled:     true,
+			MaxAttempts: 3,
+		},
 	}
 }
 

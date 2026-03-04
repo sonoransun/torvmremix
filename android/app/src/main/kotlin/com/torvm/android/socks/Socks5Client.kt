@@ -31,9 +31,20 @@ class Socks5Client(
      */
     var protector: ((Socket) -> Boolean)? = null
 
+    /**
+     * Optional SOCKS5 username/password authentication credentials.
+     * When set, the client offers both no-auth (0x00) and username/password (0x02)
+     * methods. Tor uses different SOCKS5 credentials to create isolated circuits,
+     * enabling per-app identity separation.
+     */
+    var authUsername: String? = null
+    var authPassword: String? = null
+
     private companion object {
         const val SOCKS_VERSION: Byte = 0x05
         const val AUTH_NONE: Byte = 0x00
+        const val AUTH_USERPASS: Byte = 0x02
+        const val USERPASS_VERSION: Byte = 0x01
         const val CMD_CONNECT: Byte = 0x01
         const val RESERVED: Byte = 0x00
         const val ADDR_TYPE_IPV4: Byte = 0x01
@@ -123,15 +134,25 @@ class Socks5Client(
     /**
      * Perform the SOCKS5 greeting/authentication negotiation.
      *
-     * Sends: [0x05, 0x01, 0x00] (version 5, 1 auth method, no-auth)
-     * Expects: [0x05, 0x00] (version 5, no-auth selected)
+     * When [authUsername] and [authPassword] are set, offers both no-auth (0x00)
+     * and username/password (0x02) methods. If the server selects username/password,
+     * performs the sub-negotiation per RFC 1929.
+     *
+     * Tor uses distinct SOCKS5 credentials to create separate circuits, enabling
+     * per-app traffic isolation.
      */
     private fun performGreeting(output: OutputStream, input: InputStream) {
-        // Send greeting: version 5, 1 method offered, no-auth
-        output.write(byteArrayOf(SOCKS_VERSION, 0x01, AUTH_NONE))
+        val hasAuth = authUsername != null && authPassword != null
+
+        if (hasAuth) {
+            // Offer 2 methods: no-auth and username/password
+            output.write(byteArrayOf(SOCKS_VERSION, 0x02, AUTH_NONE, AUTH_USERPASS))
+        } else {
+            // Offer 1 method: no-auth only
+            output.write(byteArrayOf(SOCKS_VERSION, 0x01, AUTH_NONE))
+        }
         output.flush()
 
-        // Read 2-byte response
         val response = readExact(input, 2)
 
         if (response[0] != SOCKS_VERSION) {
@@ -139,9 +160,56 @@ class Socks5Client(
                 "Unexpected SOCKS version in greeting response: ${response[0].toInt() and 0xFF}"
             )
         }
-        if (response[1] != AUTH_NONE) {
+
+        when (response[1]) {
+            AUTH_NONE -> {
+                // No authentication required -- proceed
+            }
+            AUTH_USERPASS -> {
+                if (!hasAuth) {
+                    throw Socks5Exception("Server selected username/password auth but no credentials provided")
+                }
+                performUsernamePasswordAuth(output, input, authUsername!!, authPassword!!)
+            }
+            else -> {
+                throw Socks5Exception(
+                    "SOCKS5 server selected unsupported auth method: ${response[1].toInt() and 0xFF}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Perform SOCKS5 username/password sub-negotiation per RFC 1929.
+     *
+     * Format: [0x01, ulen, username, plen, password]
+     * Response: [0x01, status] where 0x00 = success
+     */
+    private fun performUsernamePasswordAuth(
+        output: OutputStream,
+        input: InputStream,
+        username: String,
+        password: String
+    ) {
+        val userBytes = username.toByteArray(Charsets.UTF_8)
+        val passBytes = password.toByteArray(Charsets.UTF_8)
+        require(userBytes.size <= 255) { "Username too long: ${userBytes.size} bytes (max 255)" }
+        require(passBytes.size <= 255) { "Password too long: ${passBytes.size} bytes (max 255)" }
+
+        val request = ByteArray(3 + userBytes.size + passBytes.size)
+        request[0] = USERPASS_VERSION
+        request[1] = userBytes.size.toByte()
+        System.arraycopy(userBytes, 0, request, 2, userBytes.size)
+        request[2 + userBytes.size] = passBytes.size.toByte()
+        System.arraycopy(passBytes, 0, request, 3 + userBytes.size, passBytes.size)
+
+        output.write(request)
+        output.flush()
+
+        val response = readExact(input, 2)
+        if (response[1].toInt() != 0x00) {
             throw Socks5Exception(
-                "SOCKS5 server did not accept no-auth method: ${response[1].toInt() and 0xFF}"
+                "SOCKS5 username/password authentication failed: status ${response[1].toInt() and 0xFF}"
             )
         }
     }

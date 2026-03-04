@@ -32,10 +32,12 @@ type App struct {
 	serviceTicker *time.Ticker
 
 	// Widgets updated by observers.
-	statusLight *StatusLight
-	stateLabel  *widget.Label
-	logView     *LogView
-	modeLabel   *widget.Label
+	statusLight    *StatusLight
+	stateLabel     *widget.Label
+	logView        *LogView
+	modeLabel      *widget.Label
+	bootstrapBar   *widget.ProgressBar
+	bootstrapLabel *widget.Label
 }
 
 // New creates a GUI application.

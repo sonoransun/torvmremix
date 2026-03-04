@@ -1,4 +1,4 @@
-.PHONY: all vm controller install clean
+.PHONY: all vm controller ios install clean test test-integration lint
 
 all: vm controller
 
@@ -13,3 +13,16 @@ install: all
 
 clean:
 	rm -rf dist/
+
+test:
+	cd controller && go test -v -race ./...
+	cd android && ./gradlew testDebugUnitTest
+
+test-integration:
+	cd controller && go test -v -tags integration -race ./...
+
+ios:
+	xcodebuild -project ios/TorVM.xcodeproj -scheme TorVM -sdk iphoneos -configuration Release build
+
+lint:
+	cd controller && golangci-lint run ./...

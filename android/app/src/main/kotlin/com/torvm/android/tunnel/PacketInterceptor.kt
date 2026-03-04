@@ -1,6 +1,7 @@
 package com.torvm.android.tunnel
 
 import com.torvm.android.dns.DnsRelay
+import com.torvm.android.packet.Checksum
 import com.torvm.android.packet.IPv4Header
 import com.torvm.android.packet.TcpHeader
 import com.torvm.android.packet.UdpHeader
@@ -60,6 +61,11 @@ class PacketInterceptor(
         when (ipHeader.protocol) {
             IPv4Header.PROTOCOL_TCP -> {
                 if (length < transportOffset + MIN_TCP_HEADER_SIZE) return
+
+                // Verify TCP checksum before processing
+                if (!Checksum.verifyTransportChecksum(ipHeader, packet, transportOffset, length)) {
+                    return  // Invalid checksum -- drop
+                }
 
                 val tcpHeader: TcpHeader
                 try {

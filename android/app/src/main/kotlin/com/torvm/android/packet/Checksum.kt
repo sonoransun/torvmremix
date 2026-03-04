@@ -66,6 +66,46 @@ object Checksum {
      * @param payload the data payload following the transport header
      * @return the 16-bit checksum value
      */
+    /**
+     * Verify a TCP or UDP checksum by computing the checksum over the
+     * pseudo-header plus the raw transport segment (including the stored
+     * checksum field). Returns true if the checksum is valid.
+     *
+     * @param ipHeader the IPv4 header (provides source/dest addresses and protocol)
+     * @param packet the raw packet buffer
+     * @param transportOffset byte offset where the transport segment begins
+     * @param length total valid bytes in the packet
+     * @return true if the checksum is valid
+     */
+    fun verifyTransportChecksum(
+        ipHeader: IPv4Header,
+        packet: ByteArray,
+        transportOffset: Int,
+        length: Int
+    ): Boolean {
+        val segmentLength = length - transportOffset
+        if (segmentLength < 8) return false  // Minimum UDP header size
+
+        val totalLength = 12 + segmentLength
+        val buffer = ByteArray(totalLength)
+
+        // Pseudo-header: source address (4 bytes)
+        System.arraycopy(ipHeader.sourceAddress, 0, buffer, 0, 4)
+        // Pseudo-header: destination address (4 bytes)
+        System.arraycopy(ipHeader.destAddress, 0, buffer, 4, 4)
+        // Pseudo-header: zero + protocol + segment length
+        buffer[8] = 0
+        buffer[9] = ipHeader.protocol.toByte()
+        buffer[10] = (segmentLength shr 8).toByte()
+        buffer[11] = segmentLength.toByte()
+
+        // Transport segment (including stored checksum field)
+        System.arraycopy(packet, transportOffset, buffer, 12, segmentLength)
+
+        // If checksum is valid, ipChecksum over pseudo-header + segment = 0
+        return ipChecksum(buffer) == 0
+    }
+
     fun tcpUdpChecksum(
         ipHeader: IPv4Header,
         transportHeader: ByteArray,

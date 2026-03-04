@@ -8,11 +8,15 @@ import (
 	"os/exec"
 )
 
-type linuxManager struct{}
+type linuxManager struct {
+	sessionKey []byte
+}
 
 // NewManager returns a Linux network manager.
 func NewManager() Manager {
-	return &linuxManager{}
+	return &linuxManager{
+		sessionKey: newSessionKey(),
+	}
 }
 
 func (m *linuxManager) CreateTAP(name string, hostIP, vmIP net.IP, mask net.IPMask) error {
@@ -45,12 +49,19 @@ func (m *linuxManager) SaveConfig() (*SavedConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("save routes: %w", err)
 	}
-	return &SavedConfig{Data: out, Platform: "linux"}, nil
+	return &SavedConfig{
+		Data:     out,
+		Platform: "linux",
+		HMAC:     computeHMAC(m.sessionKey, out),
+	}, nil
 }
 
 func (m *linuxManager) RestoreConfig(cfg *SavedConfig) error {
 	if cfg == nil || cfg.Platform != "linux" {
 		return fmt.Errorf("invalid saved config for linux")
+	}
+	if err := verifyHMAC(m.sessionKey, cfg.Data, cfg.HMAC); err != nil {
+		return fmt.Errorf("saved config integrity check failed: %w", err)
 	}
 	// Route restoration is handled by TeardownRouting, which removes
 	// the specific routes we added. The kernel restores defaults

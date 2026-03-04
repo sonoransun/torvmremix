@@ -1,0 +1,83 @@
+name: TorVM
+options:
+  bundleIdPrefix: com.torvm
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_ALLOWED: "NO"
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  TorVM:
+    type: application
+    platform: iOS
+    sources:
+      - path: TorVM
+        excludes:
+          - "*.entitlements"
+      - path: TorVMTunnel/Packet
+        group: Shared/Packet
+      - path: TorVM/Data
+        group: Shared/Data
+    settings:
+      base:
+        INFOPLIST_FILE: TorVM/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.torvm.ios
+        CODE_SIGN_ENTITLEMENTS: TorVM/TorVM.entitlements
+    dependencies:
+      - target: TorVMTunnel
+        embed: true
+        codeSign: true
+        buildPhase:
+          copyFiles:
+            destination: plugins
+
+  TorVMTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TorVMTunnel
+        excludes:
+          - "*.entitlements"
+      - path: TorVM/Data/ConnectionConfig.swift
+        group: Shared
+      - path: TorVM/Security/KeychainManager.swift
+        group: Shared
+      - path: TorVM/Logging/TunnelLogger.swift
+        group: Shared
+    settings:
+      base:
+        INFOPLIST_FILE: TorVMTunnel/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.torvm.ios.tunnel
+        CODE_SIGN_ENTITLEMENTS: TorVMTunnel/TorVMTunnel.entitlements
+
+  TorVMTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: TorVMTests
+    dependencies:
+      - target: TorVM
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.torvm.ios.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/TorVM.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TorVM"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  TorVM:
+    build:
+      targets:
+        TorVM: all
+        TorVMTunnel: all
+    test:
+      targets:
+        - TorVMTests
+    run:
+      config: Debug

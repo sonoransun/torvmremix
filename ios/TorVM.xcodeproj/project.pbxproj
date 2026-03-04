@@ -1,0 +1,752 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0BF2C73739148EE555B7D033 /* PacketInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6F0BC394CD4E45ED3FC8F3 /* PacketInterceptor.swift */; };
+		0EBB8A91750852BF1C93EB34 /* TunnelLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BF49AE994F77D3801E27D63 /* TunnelLogger.swift */; };
+		10DB31E7830E843E15B7F6AF /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B54A659C66CF88410A343E7 /* VPNManager.swift */; };
+		125D4AEAA198151D6566B5CA /* PacketBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8913623235E03BC52C579E5 /* PacketBuilder.swift */; };
+		161407A04369440168BB63BB /* StatusIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17152671281C3C5D61C5DE8B /* StatusIndicator.swift */; };
+		174695A039B181D25F30AD72 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A0AB4E447716EEED80E63A8 /* SettingsView.swift */; };
+		31FF358CCC93040FB6D68FA2 /* DnsRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21EEC86847626D8D138645D3 /* DnsRelay.swift */; };
+		33764B5057695DC53A2230F5 /* Checksum.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93ABA79FB89E9B788EA30A38 /* Checksum.swift */; };
+		3403CC70F4679F0C84436A35 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8CAB52C2F75F900C825AD /* KeychainManager.swift */; };
+		4332FE776E88B2EAFF5AF730 /* CongestionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B20B7F5C1788681DEAEBFBC /* CongestionController.swift */; };
+		458F8E4CF47EB8E9EEDFCE89 /* TorVMTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F66729E953836DFAA2691218 /* TorVMTunnel.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		4613597E5D279A3E80B3A607 /* TcpState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72C6398C0FD9CBF4957A0109 /* TcpState.swift */; };
+		4CD581EBAD224847C7F6A82B /* ConnectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0AA8A5B27EB9792C657A444 /* ConnectionCard.swift */; };
+		52B0A97E04D842EA8CAB044E /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8CAB52C2F75F900C825AD /* KeychainManager.swift */; };
+		5421AA1EB1D4053DB8B6B1F0 /* SessionKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E36A98E99A57151625F907 /* SessionKey.swift */; };
+		7264669E320E830BA731F3EC /* TorVMApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A323CDC2BD686DAFBBE7598 /* TorVMApp.swift */; };
+		750DCCB8939198B4DD1DE36E /* SecureEnclaveKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DCD235C2011696C0457033 /* SecureEnclaveKeyManager.swift */; };
+		836948EEC45C83EAD318E1FB /* TunnelLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BF49AE994F77D3801E27D63 /* TunnelLogger.swift */; };
+		89C3160DF0501C82DF7452A7 /* ConnectionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 092DAA3C983C2DCE47415978 /* ConnectionConfig.swift */; };
+		8BF2A890F5FF9D7FE3049FB7 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213FC0B7B26953DD106C1FBF /* HomeView.swift */; };
+		962861CD17D4DC4CF4221098 /* TcpSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F49EB75427ADE4048550695 /* TcpSession.swift */; };
+		979B8BABBEA21BB3A14B8C3E /* Socks5Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE5BF9C6F9473AA2F37EC29 /* Socks5Error.swift */; };
+		A2ACC345572F304F034FEB78 /* FirewallInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119EB14C3439BB764F6B136B /* FirewallInfoView.swift */; };
+		A35C2F20D38E0534CDF0D9E9 /* TcpSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65FA0FA08BDE73707B17E54D /* TcpSessionManager.swift */; };
+		B067B978123579CDE906E260 /* Socks5Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = 367FD8B13D6A1CB0CDFE5DAA /* Socks5Client.swift */; };
+		B595909EA596E5E51879793B /* TcpHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5757A8A5CF6815517510E31 /* TcpHeader.swift */; };
+		C1DC82DF7EF3372CD5F3D36D /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0D62B71DAC6B98D5CE4EB7 /* PacketTunnelProvider.swift */; };
+		C5499B829FBF0BF15DBB4CE1 /* IPv4Header.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA618381E31D3E4E5ADCD76 /* IPv4Header.swift */; };
+		C54C033D0833C21F0038C087 /* Checksum.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93ABA79FB89E9B788EA30A38 /* Checksum.swift */; };
+		C5FD02B40B1FB95703C10E6B /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E6006BDE3DB3E51FB3788B1 /* LogView.swift */; };
+		CDEDEE647F97B4A633E3345F /* ConnectionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 092DAA3C983C2DCE47415978 /* ConnectionConfig.swift */; };
+		D0E0C5CCB6E6BE7A5A02E86E /* BiometricAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25B488A56CF583EBDB45E263 /* BiometricAuthManager.swift */; };
+		E3CEAE0F340F1714473DCDEE /* UdpHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D72DC6D392C7EB654DB39A5 /* UdpHeader.swift */; };
+		E4D9E0586AF5BC6CFA52BF3B /* TcpHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5757A8A5CF6815517510E31 /* TcpHeader.swift */; };
+		E730A538D3A888D43B12C91C /* UdpHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D72DC6D392C7EB654DB39A5 /* UdpHeader.swift */; };
+		EBA24B6B1DE7620DC37F7714 /* PacketBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8913623235E03BC52C579E5 /* PacketBuilder.swift */; };
+		ECFDDA24B7F43728D6177E99 /* IPv4Header.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AA618381E31D3E4E5ADCD76 /* IPv4Header.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		9EF56C1956054F82A5A3055E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C785122A6BE8597A4D547106 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 304A144FA612AC9810AC8700;
+			remoteInfo = TorVMTunnel;
+		};
+		F5D464C8940D091EC20408C8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C785122A6BE8597A4D547106 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 76F30B5B9EE9B13E0C3C294A;
+			remoteInfo = TorVM;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		26307BB3C9D0B52A85663630 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				458F8E4CF47EB8E9EEDFCE89 /* TorVMTunnel.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		041466084578EBA938B6FD68 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		092DAA3C983C2DCE47415978 /* ConnectionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConnectionConfig.swift; path = TorVM/Data/ConnectionConfig.swift; sourceTree = "<group>"; };
+		0E0D62B71DAC6B98D5CE4EB7 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
+		119EB14C3439BB764F6B136B /* FirewallInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirewallInfoView.swift; sourceTree = "<group>"; };
+		17152671281C3C5D61C5DE8B /* StatusIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusIndicator.swift; sourceTree = "<group>"; };
+		213FC0B7B26953DD106C1FBF /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		21EEC86847626D8D138645D3 /* DnsRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DnsRelay.swift; sourceTree = "<group>"; };
+		25B488A56CF583EBDB45E263 /* BiometricAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuthManager.swift; sourceTree = "<group>"; };
+		2B20B7F5C1788681DEAEBFBC /* CongestionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CongestionController.swift; sourceTree = "<group>"; };
+		2E6006BDE3DB3E51FB3788B1 /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
+		2EE3A5FF8D96B784BA8862EF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		367FD8B13D6A1CB0CDFE5DAA /* Socks5Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Socks5Client.swift; sourceTree = "<group>"; };
+		3D6F0BC394CD4E45ED3FC8F3 /* PacketInterceptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketInterceptor.swift; sourceTree = "<group>"; };
+		477D8AA07D826E06F3D18879 /* TorVM.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TorVM.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4CA8CAB52C2F75F900C825AD /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KeychainManager.swift; path = TorVM/Security/KeychainManager.swift; sourceTree = "<group>"; };
+		4D72DC6D392C7EB654DB39A5 /* UdpHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UdpHeader.swift; sourceTree = "<group>"; };
+		5AA618381E31D3E4E5ADCD76 /* IPv4Header.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPv4Header.swift; sourceTree = "<group>"; };
+		65FA0FA08BDE73707B17E54D /* TcpSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpSessionManager.swift; sourceTree = "<group>"; };
+		6A0AB4E447716EEED80E63A8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		72C6398C0FD9CBF4957A0109 /* TcpState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpState.swift; sourceTree = "<group>"; };
+		7AE5BF9C6F9473AA2F37EC29 /* Socks5Error.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Socks5Error.swift; sourceTree = "<group>"; };
+		7F49EB75427ADE4048550695 /* TcpSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpSession.swift; sourceTree = "<group>"; };
+		8A323CDC2BD686DAFBBE7598 /* TorVMApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorVMApp.swift; sourceTree = "<group>"; };
+		8BF49AE994F77D3801E27D63 /* TunnelLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TunnelLogger.swift; path = TorVM/Logging/TunnelLogger.swift; sourceTree = "<group>"; };
+		93ABA79FB89E9B788EA30A38 /* Checksum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Checksum.swift; sourceTree = "<group>"; };
+		9B54A659C66CF88410A343E7 /* VPNManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VPNManager.swift; sourceTree = "<group>"; };
+		A5757A8A5CF6815517510E31 /* TcpHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TcpHeader.swift; sourceTree = "<group>"; };
+		A9E36A98E99A57151625F907 /* SessionKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionKey.swift; sourceTree = "<group>"; };
+		B81FCEDCC6C92BE0A51D8616 /* TorVMTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TorVMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B8913623235E03BC52C579E5 /* PacketBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketBuilder.swift; sourceTree = "<group>"; };
+		E0AA8A5B27EB9792C657A444 /* ConnectionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionCard.swift; sourceTree = "<group>"; };
+		F2DCD235C2011696C0457033 /* SecureEnclaveKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureEnclaveKeyManager.swift; sourceTree = "<group>"; };
+		F66729E953836DFAA2691218 /* TorVMTunnel.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TorVMTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0284F8A0121E03AFC94D9B93 /* SOCKS */ = {
+			isa = PBXGroup;
+			children = (
+				367FD8B13D6A1CB0CDFE5DAA /* Socks5Client.swift */,
+				7AE5BF9C6F9473AA2F37EC29 /* Socks5Error.swift */,
+			);
+			path = SOCKS;
+			sourceTree = "<group>";
+		};
+		0DA7A4D4B1287E27FCBA8092 /* TorVMTests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = TorVMTests;
+			sourceTree = "<group>";
+		};
+		0FEA93F87C99DA1A5EE194D4 /* {Components} */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "{Components}";
+			sourceTree = "<group>";
+		};
+		137020DB9FE46596D35B2ADD /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				092DAA3C983C2DCE47415978 /* ConnectionConfig.swift */,
+			);
+			name = Data;
+			path = TorVM/Data;
+			sourceTree = "<group>";
+		};
+		181D4F7114555E1CF92F14E3 /* TorVM */ = {
+			isa = PBXGroup;
+			children = (
+				041466084578EBA938B6FD68 /* Info.plist */,
+				8A323CDC2BD686DAFBBE7598 /* TorVMApp.swift */,
+				137020DB9FE46596D35B2ADD /* Data */,
+				2718DA61F01A10A1754F297B /* Logging */,
+				BD2859B93C122356AB95C1CB /* Security */,
+				B884D240A5DE78783F0FD9D7 /* UI */,
+				2EBA35601A66DE1AA4BDDF5C /* VPN */,
+			);
+			path = TorVM;
+			sourceTree = "<group>";
+		};
+		19F917C6A3096F3D1F1CDF81 /* DNS */ = {
+			isa = PBXGroup;
+			children = (
+				21EEC86847626D8D138645D3 /* DnsRelay.swift */,
+			);
+			path = DNS;
+			sourceTree = "<group>";
+		};
+		1D073D4FA26DD7C4D9893BF1 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				137020DB9FE46596D35B2ADD /* Data */,
+			);
+			name = Data;
+			sourceTree = "<group>";
+		};
+		2563637E1C6AFE8A24812CAB /* TorVMTunnel */ = {
+			isa = PBXGroup;
+			children = (
+				2EE3A5FF8D96B784BA8862EF /* Info.plist */,
+				0E0D62B71DAC6B98D5CE4EB7 /* PacketTunnelProvider.swift */,
+				19F917C6A3096F3D1F1CDF81 /* DNS */,
+				3B4749CFD7D783A6844D1C8A /* Packet */,
+				0284F8A0121E03AFC94D9B93 /* SOCKS */,
+				D1F2103F1A28D77F35B46E38 /* TCP */,
+				397DFA1ABDC0E9F7511F4FC5 /* Tunnel */,
+			);
+			path = TorVMTunnel;
+			sourceTree = "<group>";
+		};
+		2718DA61F01A10A1754F297B /* Logging */ = {
+			isa = PBXGroup;
+			children = (
+				8BF49AE994F77D3801E27D63 /* TunnelLogger.swift */,
+			);
+			path = Logging;
+			sourceTree = "<group>";
+		};
+		2EBA35601A66DE1AA4BDDF5C /* VPN */ = {
+			isa = PBXGroup;
+			children = (
+				9B54A659C66CF88410A343E7 /* VPNManager.swift */,
+			);
+			path = VPN;
+			sourceTree = "<group>";
+		};
+		3811AF5A66E831E2E7FB7D48 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				092DAA3C983C2DCE47415978 /* ConnectionConfig.swift */,
+				4CA8CAB52C2F75F900C825AD /* KeychainManager.swift */,
+				8BF49AE994F77D3801E27D63 /* TunnelLogger.swift */,
+				1D073D4FA26DD7C4D9893BF1 /* Data */,
+				DBEF4D6815754D2AA95558AE /* Packet */,
+			);
+			name = Shared;
+			sourceTree = "<group>";
+		};
+		397DFA1ABDC0E9F7511F4FC5 /* Tunnel */ = {
+			isa = PBXGroup;
+			children = (
+				3D6F0BC394CD4E45ED3FC8F3 /* PacketInterceptor.swift */,
+			);
+			path = Tunnel;
+			sourceTree = "<group>";
+		};
+		3B4749CFD7D783A6844D1C8A /* Packet */ = {
+			isa = PBXGroup;
+			children = (
+				93ABA79FB89E9B788EA30A38 /* Checksum.swift */,
+				5AA618381E31D3E4E5ADCD76 /* IPv4Header.swift */,
+				B8913623235E03BC52C579E5 /* PacketBuilder.swift */,
+				A5757A8A5CF6815517510E31 /* TcpHeader.swift */,
+				4D72DC6D392C7EB654DB39A5 /* UdpHeader.swift */,
+			);
+			name = Packet;
+			path = TorVMTunnel/Packet;
+			sourceTree = "<group>";
+		};
+		419EF80AE9A6BF4881BC9383 = {
+			isa = PBXGroup;
+			children = (
+				3811AF5A66E831E2E7FB7D48 /* Shared */,
+				181D4F7114555E1CF92F14E3 /* TorVM */,
+				0DA7A4D4B1287E27FCBA8092 /* TorVMTests */,
+				2563637E1C6AFE8A24812CAB /* TorVMTunnel */,
+				78700F86E77D11DA38C6AB75 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		78700F86E77D11DA38C6AB75 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				477D8AA07D826E06F3D18879 /* TorVM.app */,
+				B81FCEDCC6C92BE0A51D8616 /* TorVMTests.xctest */,
+				F66729E953836DFAA2691218 /* TorVMTunnel.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B884D240A5DE78783F0FD9D7 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				119EB14C3439BB764F6B136B /* FirewallInfoView.swift */,
+				213FC0B7B26953DD106C1FBF /* HomeView.swift */,
+				2E6006BDE3DB3E51FB3788B1 /* LogView.swift */,
+				6A0AB4E447716EEED80E63A8 /* SettingsView.swift */,
+				0FEA93F87C99DA1A5EE194D4 /* {Components} */,
+				EA3D8EB212C65F59CAC77DC9 /* Components */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		BD2859B93C122356AB95C1CB /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				25B488A56CF583EBDB45E263 /* BiometricAuthManager.swift */,
+				4CA8CAB52C2F75F900C825AD /* KeychainManager.swift */,
+				F2DCD235C2011696C0457033 /* SecureEnclaveKeyManager.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		D1F2103F1A28D77F35B46E38 /* TCP */ = {
+			isa = PBXGroup;
+			children = (
+				2B20B7F5C1788681DEAEBFBC /* CongestionController.swift */,
+				A9E36A98E99A57151625F907 /* SessionKey.swift */,
+				7F49EB75427ADE4048550695 /* TcpSession.swift */,
+				65FA0FA08BDE73707B17E54D /* TcpSessionManager.swift */,
+				72C6398C0FD9CBF4957A0109 /* TcpState.swift */,
+			);
+			path = TCP;
+			sourceTree = "<group>";
+		};
+		DBEF4D6815754D2AA95558AE /* Packet */ = {
+			isa = PBXGroup;
+			children = (
+				3B4749CFD7D783A6844D1C8A /* Packet */,
+			);
+			name = Packet;
+			sourceTree = "<group>";
+		};
+		EA3D8EB212C65F59CAC77DC9 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				E0AA8A5B27EB9792C657A444 /* ConnectionCard.swift */,
+				17152671281C3C5D61C5DE8B /* StatusIndicator.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		304A144FA612AC9810AC8700 /* TorVMTunnel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0F57674FBCDDDF8F12A883A9 /* Build configuration list for PBXNativeTarget "TorVMTunnel" */;
+			buildPhases = (
+				2ABE367688F9A6F7040E02C5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TorVMTunnel;
+			packageProductDependencies = (
+			);
+			productName = TorVMTunnel;
+			productReference = F66729E953836DFAA2691218 /* TorVMTunnel.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		492B666F6D4C10C71D0120DE /* TorVMTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A756A44E459BEF16BE27A25D /* Build configuration list for PBXNativeTarget "TorVMTests" */;
+			buildPhases = (
+				B8B71285878C399E247AFF41 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				88920C2EB60A14BE42A0AF02 /* PBXTargetDependency */,
+			);
+			name = TorVMTests;
+			packageProductDependencies = (
+			);
+			productName = TorVMTests;
+			productReference = B81FCEDCC6C92BE0A51D8616 /* TorVMTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		76F30B5B9EE9B13E0C3C294A /* TorVM */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 19E48CD2C725982E98768618 /* Build configuration list for PBXNativeTarget "TorVM" */;
+			buildPhases = (
+				236AFFB62FF7EDDEA40718E5 /* Sources */,
+				26307BB3C9D0B52A85663630 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8DBBF08D9FB2950B42FE1808 /* PBXTargetDependency */,
+			);
+			name = TorVM;
+			packageProductDependencies = (
+			);
+			productName = TorVM;
+			productReference = 477D8AA07D826E06F3D18879 /* TorVM.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C785122A6BE8597A4D547106 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					304A144FA612AC9810AC8700 = {
+						DevelopmentTeam = "";
+					};
+					492B666F6D4C10C71D0120DE = {
+						DevelopmentTeam = "";
+					};
+					76F30B5B9EE9B13E0C3C294A = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = 802BC6FB5ED0D44E877FE245 /* Build configuration list for PBXProject "TorVM" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 419EF80AE9A6BF4881BC9383;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				76F30B5B9EE9B13E0C3C294A /* TorVM */,
+				492B666F6D4C10C71D0120DE /* TorVMTests */,
+				304A144FA612AC9810AC8700 /* TorVMTunnel */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		236AFFB62FF7EDDEA40718E5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0E0C5CCB6E6BE7A5A02E86E /* BiometricAuthManager.swift in Sources */,
+				C54C033D0833C21F0038C087 /* Checksum.swift in Sources */,
+				4CD581EBAD224847C7F6A82B /* ConnectionCard.swift in Sources */,
+				89C3160DF0501C82DF7452A7 /* ConnectionConfig.swift in Sources */,
+				A2ACC345572F304F034FEB78 /* FirewallInfoView.swift in Sources */,
+				8BF2A890F5FF9D7FE3049FB7 /* HomeView.swift in Sources */,
+				C5499B829FBF0BF15DBB4CE1 /* IPv4Header.swift in Sources */,
+				3403CC70F4679F0C84436A35 /* KeychainManager.swift in Sources */,
+				C5FD02B40B1FB95703C10E6B /* LogView.swift in Sources */,
+				125D4AEAA198151D6566B5CA /* PacketBuilder.swift in Sources */,
+				750DCCB8939198B4DD1DE36E /* SecureEnclaveKeyManager.swift in Sources */,
+				174695A039B181D25F30AD72 /* SettingsView.swift in Sources */,
+				161407A04369440168BB63BB /* StatusIndicator.swift in Sources */,
+				E4D9E0586AF5BC6CFA52BF3B /* TcpHeader.swift in Sources */,
+				7264669E320E830BA731F3EC /* TorVMApp.swift in Sources */,
+				836948EEC45C83EAD318E1FB /* TunnelLogger.swift in Sources */,
+				E3CEAE0F340F1714473DCDEE /* UdpHeader.swift in Sources */,
+				10DB31E7830E843E15B7F6AF /* VPNManager.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2ABE367688F9A6F7040E02C5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				33764B5057695DC53A2230F5 /* Checksum.swift in Sources */,
+				4332FE776E88B2EAFF5AF730 /* CongestionController.swift in Sources */,
+				CDEDEE647F97B4A633E3345F /* ConnectionConfig.swift in Sources */,
+				31FF358CCC93040FB6D68FA2 /* DnsRelay.swift in Sources */,
+				ECFDDA24B7F43728D6177E99 /* IPv4Header.swift in Sources */,
+				52B0A97E04D842EA8CAB044E /* KeychainManager.swift in Sources */,
+				EBA24B6B1DE7620DC37F7714 /* PacketBuilder.swift in Sources */,
+				0BF2C73739148EE555B7D033 /* PacketInterceptor.swift in Sources */,
+				C1DC82DF7EF3372CD5F3D36D /* PacketTunnelProvider.swift in Sources */,
+				5421AA1EB1D4053DB8B6B1F0 /* SessionKey.swift in Sources */,
+				B067B978123579CDE906E260 /* Socks5Client.swift in Sources */,
+				979B8BABBEA21BB3A14B8C3E /* Socks5Error.swift in Sources */,
+				B595909EA596E5E51879793B /* TcpHeader.swift in Sources */,
+				962861CD17D4DC4CF4221098 /* TcpSession.swift in Sources */,
+				A35C2F20D38E0534CDF0D9E9 /* TcpSessionManager.swift in Sources */,
+				4613597E5D279A3E80B3A607 /* TcpState.swift in Sources */,
+				0EBB8A91750852BF1C93EB34 /* TunnelLogger.swift in Sources */,
+				E730A538D3A888D43B12C91C /* UdpHeader.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B8B71285878C399E247AFF41 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		88920C2EB60A14BE42A0AF02 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 76F30B5B9EE9B13E0C3C294A /* TorVM */;
+			targetProxy = F5D464C8940D091EC20408C8 /* PBXContainerItemProxy */;
+		};
+		8DBBF08D9FB2950B42FE1808 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 304A144FA612AC9810AC8700 /* TorVMTunnel */;
+			targetProxy = 9EF56C1956054F82A5A3055E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1A5695C62B9F874B7CA5FC9C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = TorVM/TorVM.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = TorVM/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.torvm.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		41A16A82E8DFB3D044583CDD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = TorVM/TorVM.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = TorVM/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.torvm.ios;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		74E93B9657F0EA928A4342F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.torvm.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TorVM.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TorVM";
+			};
+			name = Debug;
+		};
+		A3AAE9D4536ED20EB14BD364 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.torvm.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TorVM.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TorVM";
+			};
+			name = Release;
+		};
+		B9C24A55B4D810D9D5869D40 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		BC2470A6FC4970AAA2547A97 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TorVMTunnel/TorVMTunnel.entitlements;
+				INFOPLIST_FILE = TorVMTunnel/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.torvm.ios.tunnel;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C527822D0BEA8C8911FF3A7F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		CA348C31750B5E18D6A69CFF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TorVMTunnel/TorVMTunnel.entitlements;
+				INFOPLIST_FILE = TorVMTunnel/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.torvm.ios.tunnel;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0F57674FBCDDDF8F12A883A9 /* Build configuration list for PBXNativeTarget "TorVMTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CA348C31750B5E18D6A69CFF /* Debug */,
+				BC2470A6FC4970AAA2547A97 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		19E48CD2C725982E98768618 /* Build configuration list for PBXNativeTarget "TorVM" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				41A16A82E8DFB3D044583CDD /* Debug */,
+				1A5695C62B9F874B7CA5FC9C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		802BC6FB5ED0D44E877FE245 /* Build configuration list for PBXProject "TorVM" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B9C24A55B4D810D9D5869D40 /* Debug */,
+				C527822D0BEA8C8911FF3A7F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A756A44E459BEF16BE27A25D /* Build configuration list for PBXNativeTarget "TorVMTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				74E93B9657F0EA928A4342F0 /* Debug */,
+				A3AAE9D4536ED20EB14BD364 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C785122A6BE8597A4D547106 /* Project object */;
+}

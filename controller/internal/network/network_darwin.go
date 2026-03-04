@@ -8,11 +8,15 @@ import (
 	"os/exec"
 )
 
-type darwinManager struct{}
+type darwinManager struct {
+	sessionKey []byte
+}
 
 // NewManager returns a macOS network manager.
 func NewManager() Manager {
-	return &darwinManager{}
+	return &darwinManager{
+		sessionKey: newSessionKey(),
+	}
 }
 
 func (m *darwinManager) CreateTAP(name string, hostIP, vmIP net.IP, mask net.IPMask) error {
@@ -32,12 +36,19 @@ func (m *darwinManager) SaveConfig() (*SavedConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("save routes: %w", err)
 	}
-	return &SavedConfig{Data: out, Platform: "darwin"}, nil
+	return &SavedConfig{
+		Data:     out,
+		Platform: "darwin",
+		HMAC:     computeHMAC(m.sessionKey, out),
+	}, nil
 }
 
 func (m *darwinManager) RestoreConfig(cfg *SavedConfig) error {
 	if cfg == nil || cfg.Platform != "darwin" {
 		return fmt.Errorf("invalid saved config for darwin")
+	}
+	if err := verifyHMAC(m.sessionKey, cfg.Data, cfg.HMAC); err != nil {
+		return fmt.Errorf("saved config integrity check failed: %w", err)
 	}
 	// Route restoration is handled by TeardownRouting.
 	return nil

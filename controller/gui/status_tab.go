@@ -26,11 +26,23 @@ func (a *App) statusTab() fyne.CanvasObject {
 	a.modeLabel = widget.NewLabel(modeTxt)
 	a.modeLabel.TextStyle = fyne.TextStyle{Italic: true}
 
+	a.bootstrapBar = widget.NewProgressBar()
+	a.bootstrapBar.Min = 0
+	a.bootstrapBar.Max = 100
+	a.bootstrapLabel = widget.NewLabel("")
+
 	startBtn := widget.NewButton("Start", func() { a.startVM() })
 	stopBtn := widget.NewButton("Stop", func() { a.stopVM() })
+	newIdentityBtn := widget.NewButton("New Identity", func() {
+		if err := a.engine.NewIdentity(); err != nil {
+			a.logger.Error("new identity: %v", err)
+		} else {
+			a.logger.Info("Tor identity renewed")
+		}
+	})
 
 	statusRow := container.NewHBox(a.statusLight, a.stateLabel)
-	buttonRow := container.NewHBox(startBtn, stopBtn)
+	buttonRow := container.NewHBox(startBtn, stopBtn, newIdentityBtn)
 
 	accelLabel := widget.NewLabel("Acceleration: " + a.cfg.Accel)
 	cpuLabel := widget.NewLabel("VM CPUs: " + strconv.Itoa(a.cfg.VMCPUs))
@@ -45,6 +57,12 @@ func (a *App) statusTab() fyne.CanvasObject {
 		hostIPLabel,
 		vmIPLabel,
 	)
+
+	// Register bootstrap progress observer.
+	a.engine.OnBootstrapProgress(func(progress int, summary string) {
+		a.bootstrapBar.SetValue(float64(progress))
+		a.bootstrapLabel.SetText(summary)
+	})
 
 	// In service mode, poll launchd for status display.
 	if a.serviceMode {
@@ -66,6 +84,9 @@ func (a *App) statusTab() fyne.CanvasObject {
 		a.modeLabel,
 		statusRow,
 		buttonRow,
+		widget.NewSeparator(),
+		a.bootstrapBar,
+		a.bootstrapLabel,
 		widget.NewSeparator(),
 		info,
 		layout.NewSpacer(),
