@@ -110,6 +110,47 @@ fi
 # also seed from sha1 of full cmdline
 sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
 
+# Load hardware entropy kernel modules.
+# hw_random provides the /dev/hwrng framework; padlock-rng registers
+# VIA XSTORE as an hwrng source so rngd harvests from it automatically.
+modprobe hw_random 2>/dev/null
+modprobe padlock-rng 2>/dev/null
+
+# Start rngd (rng-tools) if requested. Harvests from /dev/hwrng which
+# aggregates virtio-rng, RDRAND (via drng), and padlock-rng sources.
+if has_param 'RNGD='; then
+  if command -v rngd >/dev/null 2>&1; then
+    if [ -c /dev/hwrng ]; then
+      rngd -r /dev/hwrng 2>/dev/null
+    else
+      rngd 2>/dev/null
+    fi
+    d "Started rngd entropy daemon"
+  fi
+fi
+
+# Start haveged (CPU timing jitter entropy) if requested.
+if has_param 'HAVEGED='; then
+  if command -v haveged >/dev/null 2>&1; then
+    haveged -w 1024 -v 0 2>/dev/null
+    d "Started haveged entropy daemon"
+  fi
+fi
+
+# Start serial entropy reader if an external hardware RNG is attached.
+if has_param 'SERIAL_ENTROPY='; then
+  if [ -c /dev/ttyS1 ]; then
+    (while true; do
+      timeout 5 head -c 256 /dev/ttyS1 > /dev/urandom 2>/dev/null
+      sleep 10
+    done) &
+    d "Started serial entropy reader on /dev/ttyS1"
+  fi
+fi
+
+# Launch entropy health monitor and mixer daemon.
+nohup /bin/sh /bin/entropy-mix.sh >/dev/null 2>&1 &
+
 mkdir -p /var/run /var/log /var/lock /var/state
 touch /var/log/wtmp
 touch /var/log/lastlog

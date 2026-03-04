@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
 )
 
 // tapNameUnixRe matches valid Unix TAP interface names: starts with a letter,
@@ -61,6 +62,40 @@ type ServiceConfig struct {
 	RunAtLoad bool `json:"run_at_load"`
 }
 
+// EntropyConfig holds hardware entropy and RNG settings for the VM.
+type EntropyConfig struct {
+	// EnableHaveged starts the haveged daemon inside the VM for
+	// CPU timing jitter entropy (HAVEGE algorithm).
+	EnableHaveged bool `json:"enable_haveged"`
+
+	// EnableRngd starts the rngd daemon inside the VM to harvest
+	// entropy from /dev/hwrng, RDRAND, and other hardware sources.
+	EnableRngd bool `json:"enable_rngd"`
+
+	// ExposeRDRAND adds the +rdrand CPU flag when running under TCG
+	// (software emulation). Under KVM/HVF with -cpu host, RDRAND
+	// passes through natively and this setting is ignored.
+	ExposeRDRAND bool `json:"expose_rdrand"`
+
+	// SerialEntropyDevice is an optional host device path for an
+	// external hardware RNG (e.g., "/dev/ttyUSB0"). When set, QEMU
+	// creates a chardev and exposes it as a serial port to the guest.
+	SerialEntropyDevice string `json:"serial_entropy_device"`
+
+	// VirtioRNGMaxBytes sets the rate limit for the virtio-rng-pci
+	// device (max bytes per period). Range: 64-65536. Default: 1024.
+	VirtioRNGMaxBytes int `json:"virtio_rng_max_bytes"`
+
+	// VirtioRNGPeriod sets the rate limit period in milliseconds
+	// for the virtio-rng-pci device. Range: 100-60000. Default: 1000.
+	VirtioRNGPeriod int `json:"virtio_rng_period"`
+
+	// KernelEntropyBytes is the number of random bytes passed to the
+	// VM via the kernel command line ENTROPY= parameter.
+	// Range: 16-256. Default: 64.
+	KernelEntropyBytes int `json:"kernel_entropy_bytes"`
+}
+
 // Config holds all configuration for the TorVM controller.
 type Config struct {
 	TAPName       string `json:"tap_name"`
@@ -91,6 +126,7 @@ type Config struct {
 	Proxy         ProxyConfig   `json:"proxy"`
 	Service       ServiceConfig `json:"service"`
 	Retry         RetryConfig   `json:"retry"`
+	Entropy       EntropyConfig `json:"entropy"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -122,6 +158,14 @@ func DefaultConfig() *Config {
 		Retry: RetryConfig{
 			Enabled:     true,
 			MaxAttempts: 3,
+		},
+		Entropy: EntropyConfig{
+			EnableHaveged:      true,
+			EnableRngd:         true,
+			ExposeRDRAND:       true,
+			VirtioRNGMaxBytes:  1024,
+			VirtioRNGPeriod:    1000,
+			KernelEntropyBytes: 64,
 		},
 	}
 }
@@ -249,6 +293,28 @@ func (c *Config) Validate() error {
 		// valid
 	default:
 		return fmt.Errorf("invalid Bridge.Transport: %q", c.Bridge.Transport)
+	}
+
+	// Validate entropy settings.
+	if c.Entropy.VirtioRNGMaxBytes < 64 || c.Entropy.VirtioRNGMaxBytes > 65536 {
+		return fmt.Errorf("Entropy.VirtioRNGMaxBytes must be 64-65536, got %d", c.Entropy.VirtioRNGMaxBytes)
+	}
+	if c.Entropy.VirtioRNGPeriod < 100 || c.Entropy.VirtioRNGPeriod > 60000 {
+		return fmt.Errorf("Entropy.VirtioRNGPeriod must be 100-60000, got %d", c.Entropy.VirtioRNGPeriod)
+	}
+	if c.Entropy.KernelEntropyBytes < 16 || c.Entropy.KernelEntropyBytes > 256 {
+		return fmt.Errorf("Entropy.KernelEntropyBytes must be 16-256, got %d", c.Entropy.KernelEntropyBytes)
+	}
+	if c.Entropy.SerialEntropyDevice != "" {
+		if strings.Contains(c.Entropy.SerialEntropyDevice, "\x00") {
+			return fmt.Errorf("Entropy.SerialEntropyDevice contains null byte")
+		}
+		if !strings.HasPrefix(c.Entropy.SerialEntropyDevice, "/dev/") {
+			return fmt.Errorf("Entropy.SerialEntropyDevice must be a /dev/ path, got %q", c.Entropy.SerialEntropyDevice)
+		}
+		if strings.Contains(c.Entropy.SerialEntropyDevice, "..") {
+			return fmt.Errorf("Entropy.SerialEntropyDevice must not contain '..'")
+		}
 	}
 
 	return nil

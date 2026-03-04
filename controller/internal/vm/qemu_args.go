@@ -35,9 +35,16 @@ func (inst *Instance) BuildArgs() ([]string, error) {
 	cpu := "host"
 	if accel == "tcg" {
 		cpu = "qemu64"
+		if cfg.Entropy.ExposeRDRAND {
+			cpu = "qemu64,+rdrand"
+		}
 	}
 
-	entropy, err := security.EntropyHexString(32)
+	entropyBytes := cfg.Entropy.KernelEntropyBytes
+	if entropyBytes == 0 {
+		entropyBytes = 32
+	}
+	entropy, err := security.EntropyHexString(entropyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("generate entropy: %w", err)
 	}
@@ -52,6 +59,15 @@ func (inst *Instance) BuildArgs() ([]string, error) {
 		cfg.ControlPort,
 		entropy,
 	)
+	if cfg.Entropy.EnableHaveged {
+		kernelAppend += " HAVEGED=1"
+	}
+	if cfg.Entropy.EnableRngd {
+		kernelAppend += " RNGD=1"
+	}
+	if cfg.Entropy.SerialEntropyDevice != "" {
+		kernelAppend += " SERIAL_ENTROPY=1"
+	}
 
 	// Machine type with platform-specific optimizations.
 	machine := machineArgs(cfg)
@@ -79,7 +95,12 @@ func (inst *Instance) BuildArgs() ([]string, error) {
 	}
 
 	// Virtio entropy device: high-quality RNG from host.
-	args = append(args, rngArgs()...)
+	args = append(args, rngArgs(cfg)...)
+
+	// Serial entropy device for external hardware RNG.
+	if serialArgs := serialEntropyArgs(cfg); serialArgs != nil {
+		args = append(args, serialArgs...)
+	}
 
 	// Virtio memory balloon for dynamic memory management.
 	args = append(args, "-device", "virtio-balloon-pci")
@@ -168,7 +189,16 @@ func blockArgs(cfg *config.Config) []string {
 // by the host's random number generator. This provides high-quality
 // entropy to the VM for Tor's cryptographic operations without relying
 // on slow kernel command-line seeding alone.
-func rngArgs() []string {
+func rngArgs(cfg *config.Config) []string {
+	maxBytes := cfg.Entropy.VirtioRNGMaxBytes
+	if maxBytes == 0 {
+		maxBytes = 1024
+	}
+	period := cfg.Entropy.VirtioRNGPeriod
+	if period == 0 {
+		period = 1000
+	}
+
 	var rngBackend string
 	if runtime.GOOS == "windows" {
 		// Windows: use QEMU's built-in PRNG (backed by CryptGenRandom).
@@ -180,7 +210,20 @@ func rngArgs() []string {
 
 	return []string{
 		"-object", rngBackend,
-		"-device", "virtio-rng-pci,rng=rng0,max-bytes=1024,period=1000",
+		"-device", fmt.Sprintf("virtio-rng-pci,rng=rng0,max-bytes=%d,period=%d", maxBytes, period),
+	}
+}
+
+// serialEntropyArgs returns QEMU arguments for a serial port backed by
+// a host character device, used for external hardware RNG dongles.
+func serialEntropyArgs(cfg *config.Config) []string {
+	dev := cfg.Entropy.SerialEntropyDevice
+	if dev == "" {
+		return nil
+	}
+	return []string{
+		"-chardev", fmt.Sprintf("serial,id=entropy_serial,path=%s", dev),
+		"-device", "isa-serial,chardev=entropy_serial",
 	}
 }
 

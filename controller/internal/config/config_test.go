@@ -280,6 +280,103 @@ func TestLoadInsecurePermissions(t *testing.T) {
 	}
 }
 
+func TestValidateEntropyVirtioRNGMaxBytes(t *testing.T) {
+	tests := []struct {
+		name     string
+		maxBytes int
+		wantErr  bool
+	}{
+		{"too low", 32, true},
+		{"minimum", 64, false},
+		{"default", 1024, false},
+		{"maximum", 65536, false},
+		{"too high", 65537, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Entropy.VirtioRNGMaxBytes = tt.maxBytes
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VirtioRNGMaxBytes=%d: got err=%v, wantErr=%v", tt.maxBytes, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateEntropyVirtioRNGPeriod(t *testing.T) {
+	tests := []struct {
+		name    string
+		period  int
+		wantErr bool
+	}{
+		{"too low", 50, true},
+		{"minimum", 100, false},
+		{"default", 1000, false},
+		{"maximum", 60000, false},
+		{"too high", 60001, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Entropy.VirtioRNGPeriod = tt.period
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VirtioRNGPeriod=%d: got err=%v, wantErr=%v", tt.period, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateEntropyKernelBytes(t *testing.T) {
+	tests := []struct {
+		name    string
+		bytes   int
+		wantErr bool
+	}{
+		{"too low", 8, true},
+		{"minimum", 16, false},
+		{"default", 64, false},
+		{"maximum", 256, false},
+		{"too high", 257, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Entropy.KernelEntropyBytes = tt.bytes
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("KernelEntropyBytes=%d: got err=%v, wantErr=%v", tt.bytes, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateEntropySerialDevice(t *testing.T) {
+	tests := []struct {
+		name    string
+		device  string
+		wantErr bool
+	}{
+		{"empty", "", false},
+		{"valid usb", "/dev/ttyUSB0", false},
+		{"valid serial", "/dev/ttyS1", false},
+		{"not under dev", "/tmp/fake", true},
+		{"path traversal", "/dev/../etc/passwd", true},
+		{"null byte", "/dev/tty\x00evil", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Entropy.SerialEntropyDevice = tt.device
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SerialEntropyDevice=%q: got err=%v, wantErr=%v", tt.device, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestLoadConfigWithInvalidValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "config.json")

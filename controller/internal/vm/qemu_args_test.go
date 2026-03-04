@@ -36,7 +36,8 @@ func TestBuildArgsBasic(t *testing.T) {
 
 	// Check essential args are present.
 	assertContains(t, args, "-name", "TorVM")
-	assertContains(t, args, "-cpu", "qemu64")
+	// Default config has ExposeRDRAND=true, so TCG gets +rdrand.
+	assertContains(t, args, "-cpu", "qemu64,+rdrand")
 	assertContains(t, args, "-accel", "tcg")
 	assertContains(t, args, "-smp", fmt.Sprintf("%d", cfg.VMCPUs))
 	assertContains(t, args, "-m", fmt.Sprintf("%d", cfg.VMMemoryMB))
@@ -48,18 +49,24 @@ func TestBuildArgsBasic(t *testing.T) {
 func TestBuildArgsCPUSelection(t *testing.T) {
 	tests := []struct {
 		accel   string
+		rdrand  bool
 		wantCPU string
 	}{
-		{"tcg", "qemu64"},
-		{"kvm", "host"},
-		{"hvf", "host"},
-		{"whpx", "host"},
-		{"", "qemu64"}, // default is tcg
+		{"tcg", true, "qemu64,+rdrand"},
+		{"tcg", false, "qemu64"},
+		{"kvm", true, "host"},
+		{"kvm", false, "host"},
+		{"hvf", true, "host"},
+		{"whpx", true, "host"},
+		{"", true, "qemu64,+rdrand"},   // default is tcg
+		{"", false, "qemu64"},           // default is tcg
 	}
 	for _, tt := range tests {
-		t.Run(tt.accel, func(t *testing.T) {
+		name := fmt.Sprintf("%s_rdrand=%v", tt.accel, tt.rdrand)
+		t.Run(name, func(t *testing.T) {
 			cfg := testConfig()
 			cfg.Accel = tt.accel
+			cfg.Entropy.ExposeRDRAND = tt.rdrand
 			inst := testInstance(cfg)
 			args, err := inst.BuildArgs()
 			if err != nil {
@@ -178,7 +185,8 @@ func TestBlockArgsContainVirtioBlk(t *testing.T) {
 }
 
 func TestRngArgsPlatform(t *testing.T) {
-	args := rngArgs()
+	cfg := testConfig()
+	args := rngArgs(cfg)
 	// Find the -object arg.
 	objectArg := ""
 	for i, a := range args {
@@ -379,6 +387,133 @@ func TestBuildArgsContainsVirtioBalloon(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertContains(t, args, "-device", "virtio-balloon-pci")
+}
+
+func TestRngArgsConfigurableRate(t *testing.T) {
+	cfg := testConfig()
+	cfg.Entropy.VirtioRNGMaxBytes = 4096
+	cfg.Entropy.VirtioRNGPeriod = 2000
+
+	args := rngArgs(cfg)
+
+	deviceArg := ""
+	for i, a := range args {
+		if a == "-device" && i+1 < len(args) {
+			deviceArg = args[i+1]
+			break
+		}
+	}
+	want := "virtio-rng-pci,rng=rng0,max-bytes=4096,period=2000"
+	if deviceArg != want {
+		t.Errorf("rng device arg = %q, want %q", deviceArg, want)
+	}
+}
+
+func TestSerialEntropyArgs(t *testing.T) {
+	cfg := testConfig()
+	cfg.Entropy.SerialEntropyDevice = "/dev/ttyUSB0"
+
+	args := serialEntropyArgs(cfg)
+	if len(args) != 4 {
+		t.Fatalf("expected 4 args, got %d: %v", len(args), args)
+	}
+	if !strings.Contains(args[1], "/dev/ttyUSB0") {
+		t.Errorf("expected serial device path in args, got %v", args)
+	}
+}
+
+func TestSerialEntropyArgsEmpty(t *testing.T) {
+	cfg := testConfig()
+	cfg.Entropy.SerialEntropyDevice = ""
+
+	args := serialEntropyArgs(cfg)
+	if args != nil {
+		t.Errorf("expected nil args for empty serial device, got %v", args)
+	}
+}
+
+func TestBuildArgsKernelAppendHavegedRngd(t *testing.T) {
+	cfg := testConfig()
+	cfg.Entropy.EnableHaveged = true
+	cfg.Entropy.EnableRngd = true
+	cfg.Entropy.SerialEntropyDevice = "/dev/ttyUSB0"
+	inst := testInstance(cfg)
+
+	args, err := inst.BuildArgs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	appendArg := ""
+	for i, a := range args {
+		if a == "-append" && i+1 < len(args) {
+			appendArg = args[i+1]
+			break
+		}
+	}
+	for _, substr := range []string{"HAVEGED=1", "RNGD=1", "SERIAL_ENTROPY=1"} {
+		if !strings.Contains(appendArg, substr) {
+			t.Errorf("-append missing %q: %s", substr, appendArg)
+		}
+	}
+}
+
+func TestBuildArgsKernelAppendNoHaveged(t *testing.T) {
+	cfg := testConfig()
+	cfg.Entropy.EnableHaveged = false
+	cfg.Entropy.EnableRngd = false
+	inst := testInstance(cfg)
+
+	args, err := inst.BuildArgs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	appendArg := ""
+	for i, a := range args {
+		if a == "-append" && i+1 < len(args) {
+			appendArg = args[i+1]
+			break
+		}
+	}
+	if strings.Contains(appendArg, "HAVEGED=") {
+		t.Errorf("-append should not contain HAVEGED= when disabled: %s", appendArg)
+	}
+	if strings.Contains(appendArg, "RNGD=") {
+		t.Errorf("-append should not contain RNGD= when disabled: %s", appendArg)
+	}
+}
+
+func TestBuildArgsKernelEntropySize(t *testing.T) {
+	cfg := testConfig()
+	cfg.Entropy.KernelEntropyBytes = 128
+	inst := testInstance(cfg)
+
+	args, err := inst.BuildArgs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	appendArg := ""
+	for i, a := range args {
+		if a == "-append" && i+1 < len(args) {
+			appendArg = args[i+1]
+			break
+		}
+	}
+	// 128 bytes = 256 hex chars
+	if !strings.Contains(appendArg, "ENTROPY=") {
+		t.Fatal("-append missing ENTROPY=")
+	}
+	// Extract the ENTROPY value and check its length.
+	parts := strings.Split(appendArg, "ENTROPY=")
+	if len(parts) < 2 {
+		t.Fatal("could not parse ENTROPY value")
+	}
+	entropyVal := strings.Fields(parts[1])[0]
+	if len(entropyVal) != 256 {
+		t.Errorf("expected 256-char hex entropy (128 bytes), got %d chars", len(entropyVal))
+	}
 }
 
 // assertContains checks that args contains a consecutive pair of flag and value.

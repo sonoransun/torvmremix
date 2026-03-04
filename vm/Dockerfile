@@ -17,7 +17,8 @@ RUN mkdir -p /rootfs && \
         iproute2 \
         e2fsprogs \
         util-linux \
-        rng-tools && \
+        rng-tools \
+        haveged && \
     rm -rf /rootfs/var/cache/apk/* && \
     mkdir -p /rootfs/etc/tor \
              /rootfs/var/log/tor \
@@ -32,6 +33,7 @@ COPY alpine/torrc /rootfs/etc/tor/torrc
 COPY alpine/vmrouter.sh /rootfs/sbin/vmrouter.sh
 COPY alpine/torvminit /rootfs/etc/torvminit
 COPY alpine/entropy-update.sh /rootfs/bin/entropy-update.sh
+COPY alpine/entropy-mix.sh /rootfs/bin/entropy-mix.sh
 COPY alpine/sysctl.conf /rootfs/etc/sysctl.conf
 
 # Set permissions and init symlink
@@ -39,6 +41,7 @@ RUN chmod 644 /rootfs/etc/tor/torrc && \
     chmod 755 /rootfs/sbin/vmrouter.sh && \
     chmod 755 /rootfs/etc/torvminit && \
     chmod 755 /rootfs/bin/entropy-update.sh && \
+    chmod 755 /rootfs/bin/entropy-mix.sh && \
     chmod 644 /rootfs/etc/sysctl.conf && \
     chown -R 52:52 /rootfs/home/tor && \
     chmod 700 /rootfs/home/tor/data && \
