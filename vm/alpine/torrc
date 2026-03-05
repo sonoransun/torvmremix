@@ -22,3 +22,10 @@ SafeSocks 1
 ClientRejectInternalAddresses 1
 EnforceDistinctSubnets 1
 WarnPlaintextPorts 23,109,110,143
+
+# Process sandbox and resource limits
+Sandbox 1
+MaxMemInQueues 128 MB
+
+# Circuit isolation for transparent proxy
+IsolateClientAddr 1

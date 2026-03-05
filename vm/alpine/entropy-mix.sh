@@ -8,7 +8,15 @@ MIN_ENTROPY=256
 LOG_TAG="entropy-mix"
 
 log() {
-  echo "$LOG_TAG: $1" >> /var/log/entropy-mix.log 2>&1
+  # Truncate log if over 100KB to prevent disk exhaustion
+  if [ -f /var/log/entropy-mix.log ]; then
+    size=$(wc -c < /var/log/entropy-mix.log 2>/dev/null || echo 0)
+    if [ "$size" -gt 102400 ]; then
+      tail -100 /var/log/entropy-mix.log > /var/log/entropy-mix.log.tmp
+      mv /var/log/entropy-mix.log.tmp /var/log/entropy-mix.log
+    fi
+  fi
+  echo "$(date '+%Y-%m-%d %H:%M:%S') $LOG_TAG: $1" >> /var/log/entropy-mix.log 2>&1
 }
 
 # Wait for system initialization to complete.

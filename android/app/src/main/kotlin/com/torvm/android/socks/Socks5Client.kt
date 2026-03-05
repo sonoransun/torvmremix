@@ -66,6 +66,7 @@ class Socks5Client(
         val socket = Socket()
         try {
             protectAndConnect(socket)
+            socket.soTimeout = CONNECT_TIMEOUT_MS
 
             val output = socket.getOutputStream()
             val input = socket.getInputStream()
@@ -99,6 +100,7 @@ class Socks5Client(
         val socket = Socket()
         try {
             protectAndConnect(socket)
+            socket.soTimeout = CONNECT_TIMEOUT_MS
 
             val output = socket.getOutputStream()
             val input = socket.getInputStream()

@@ -170,6 +170,10 @@ PRIVIP=10.10.10.1
 PRIVINTF=eth1
 if has_param 'PRIVIP='; then
   PRIVIP=$(get_param_safe PRIVIP '0-9.')
+  if ! valid_ipv4 "$PRIVIP"; then
+    d "ERROR: Invalid PRIVIP ($PRIVIP), using default 10.10.10.1"
+    PRIVIP=10.10.10.1
+  fi
 fi
 if grep -q "${PRIVINTF}:" /proc/net/dev 2>/dev/null; then
   ip link set "$PRIVINTF" up
@@ -183,6 +187,10 @@ if has_param 'CTLSOCK='; then
   CTLADDR=$(get_param_safe CTLSOCK '0-9.:')
   CTLIP=$(echo "$CTLADDR" | sed 's/:.*//' | sed 's/[^0-9.]//g')
   CTLPORT=$(echo "$CTLADDR" | sed 's/.*://' | sed 's/[^0-9]//g')
+  if [ -n "$CTLIP" ] && ! valid_ipv4 "$CTLIP"; then
+    d "WARNING: Invalid CTLIP ($CTLIP), skipping control port"
+    unset CTLIP CTLPORT
+  fi
 fi
 if has_param 'HASHPW='; then
   HASHPW=$(get_param_safe HASHPW '0-9a-fA-F:')
@@ -293,6 +301,13 @@ else
 
   dn "Starting Tor ... "
   /etc/init.d/tor start
+  sleep 2
+  if ! pidof tor >/dev/null 2>&1; then
+    echo " FAILED."
+    d "ERROR: Tor failed to start! Check /var/log/tor/notices.log"
+    d "Halting to prevent unprotected network access."
+    exec /bin/sh
+  fi
   echo "done."
   echo
   d "Run /etc/init.d/tor status"
@@ -306,7 +321,19 @@ fi
 # end if !NOINIT
 fi
 
-# keep init alive
+# PID 1 signal handlers and zombie reaper
+shutdown_vm() {
+  d "Shutting down ..."
+  /etc/init.d/tor stop 2>/dev/null
+  kill $(jobs -p) 2>/dev/null
+  wait
+  sync
+  poweroff -f
+}
+trap shutdown_vm TERM INT
+trap '' HUP
+
+# Reap zombies and wait for signals
 while true; do
-  sleep 3600
+  wait -n 2>/dev/null || sleep 1
 done

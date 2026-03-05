@@ -32,6 +32,10 @@ class DnsRelay(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val concurrencyLimit = Semaphore(MAX_CONCURRENT_QUERIES)
 
+    private val socketLock = Any()
+    @Volatile
+    private var persistentSocket: DatagramSocket? = null
+
     companion object {
         /** Maximum size of a DNS UDP response. */
         private const val DNS_BUFFER_SIZE = 4096
@@ -56,10 +60,14 @@ class DnsRelay(
     }
 
     /**
-     * Cancel all in-flight DNS queries.
+     * Cancel all in-flight DNS queries and close the persistent socket.
      */
     fun stop() {
         scope.cancel()
+        synchronized(socketLock) {
+            persistentSocket?.close()
+            persistentSocket = null
+        }
     }
 
     /**
@@ -99,17 +107,48 @@ class DnsRelay(
     }
 
     /**
+     * Get or create the persistent DatagramSocket for upstream DNS queries.
+     * If the socket has been closed or not yet created, a new one is allocated
+     * and protected.
+     */
+    private fun getOrCreateSocket(): DatagramSocket {
+        synchronized(socketLock) {
+            var sock = persistentSocket
+            if (sock == null || sock.isClosed) {
+                sock = DatagramSocket()
+                protector?.invoke(sock)
+                sock.soTimeout = DNS_TIMEOUT_MS
+                persistentSocket = sock
+            }
+            return sock
+        }
+    }
+
+    /**
+     * Close and discard the persistent socket so it is recreated on next use.
+     */
+    private fun invalidateSocket() {
+        synchronized(socketLock) {
+            persistentSocket?.close()
+            persistentSocket = null
+        }
+    }
+
+    /**
      * Forward a raw DNS query to the upstream resolver and return the
      * response bytes.
      */
     private fun forwardDnsQuery(query: ByteArray): ByteArray {
         require(query.size >= 2) { "DNS query too short to contain transaction ID" }
 
-        val socket = DatagramSocket()
-        try {
-            protector?.invoke(socket)
-            socket.soTimeout = DNS_TIMEOUT_MS
+        val socket = try {
+            getOrCreateSocket()
+        } catch (e: Exception) {
+            invalidateSocket()
+            throw e
+        }
 
+        try {
             val address = InetAddress.getByName(dnsHost)
             socket.send(DatagramPacket(query, query.size, address, dnsPort))
 
@@ -124,9 +163,25 @@ class DnsRelay(
                 throw IllegalStateException("DNS response transaction ID mismatch")
             }
 
+            // Check RCODE in byte 3 (low nibble) for upstream errors
+            if (response.length >= 4) {
+                val rcode = buffer[3].toInt() and 0x0F
+                if (rcode == 2 || rcode == 5) {
+                    android.util.Log.w(
+                        TAG,
+                        "DNS upstream returned RCODE $rcode (${if (rcode == 2) "SERVFAIL" else "REFUSED"}) " +
+                            "for txid 0x${String.format("%02x%02x", buffer[0], buffer[1])}"
+                    )
+                }
+            }
+
             return buffer.copyOf(response.length)
-        } finally {
-            socket.close()
+        } catch (e: java.net.SocketException) {
+            invalidateSocket()
+            throw e
+        } catch (e: java.net.SocketTimeoutException) {
+            // Timeout does not invalidate the socket -- it can still be reused
+            throw e
         }
     }
 }

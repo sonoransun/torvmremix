@@ -107,6 +107,12 @@ func (inst *Instance) Start(ctx context.Context) error {
 		return fmt.Errorf("vm: already running")
 	}
 
+	// Drain any stale error from a previous run to prevent confusion.
+	select {
+	case <-inst.waitErr:
+	default:
+	}
+
 	// Write torrc overlay to state disk if bridge or proxy settings are configured.
 	overlay, err := inst.Config.TorrcOverlay()
 	if err != nil {

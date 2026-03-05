@@ -21,6 +21,10 @@ type ControlClient struct {
 	// syncResp carries non-async response lines from the reader goroutine
 	// to the command methods waiting for a reply.
 	syncResp chan string
+
+	// CommandTimeout is the maximum duration to wait for a response to a
+	// control command. Zero means 30 seconds (the default).
+	CommandTimeout time.Duration
 }
 
 // AsyncEvent represents an asynchronous event from Tor (code 650).
@@ -39,12 +43,13 @@ func NewControlClient(addr string, timeout time.Duration) (*ControlClient, error
 	}
 
 	c := &ControlClient{
-		conn:     conn,
-		reader:   bufio.NewReader(conn),
-		writer:   bufio.NewWriter(conn),
-		events:   make(chan AsyncEvent, 64),
-		done:     make(chan struct{}),
-		syncResp: make(chan string, 128),
+		conn:           conn,
+		reader:         bufio.NewReader(conn),
+		writer:         bufio.NewWriter(conn),
+		events:         make(chan AsyncEvent, 256),
+		done:           make(chan struct{}),
+		syncResp:       make(chan string, 128),
+		CommandTimeout: 30 * time.Second,
 	}
 
 	go c.readLoop()
@@ -171,6 +176,13 @@ func (c *ControlClient) sendCommand(cmd string) ([]string, error) {
 // collectResponse reads response lines from syncResp until we get the
 // final line (status code followed by space, not dash).
 func (c *ControlClient) collectResponse() ([]string, error) {
+	timeout := c.CommandTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
 	var lines []string
 	for {
 		select {
@@ -189,6 +201,8 @@ func (c *ControlClient) collectResponse() ([]string, error) {
 			}
 		case <-c.done:
 			return nil, fmt.Errorf("tor: connection closed")
+		case <-timer.C:
+			return nil, fmt.Errorf("tor: command timeout after %v", timeout)
 		}
 	}
 }
@@ -210,7 +224,8 @@ func (c *ControlClient) readLoop() {
 			select {
 			case <-c.done:
 			default:
-				// Connection error; close down.
+				// Connection error; close connection to prevent socket leak.
+				c.conn.Close()
 				close(c.done)
 			}
 			return

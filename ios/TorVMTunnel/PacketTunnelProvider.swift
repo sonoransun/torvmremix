@@ -17,6 +17,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     private var dnsRelay: DnsRelay?
     private var packetInterceptor: PacketInterceptor?
     private var isRunning = false
+    private let processingQueue = DispatchQueue(
+        label: "com.torvm.tunnel.processing",
+        qos: .userInteractive,
+        attributes: .concurrent
+    )
 
     private static let vpnAddress = "10.0.0.2"
     private static let vpnSubnetMask = "255.255.255.255"
@@ -143,17 +148,19 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         packetFlow.readPackets { [weak self] packets, protocols in
             guard let self = self, self.isRunning else { return }
 
-            for (i, packetData) in packets.enumerated() {
-                let proto = protocols[i].int32Value
-                guard proto == AF_INET else { continue }
+            self.processingQueue.async {
+                for (i, packetData) in packets.enumerated() {
+                    let proto = protocols[i].int32Value
+                    guard proto == AF_INET else { continue }
 
-                self.packetInterceptor?.intercept(
-                    packet: packetData,
-                    length: packetData.count
-                )
+                    self.packetInterceptor?.intercept(
+                        packet: packetData,
+                        length: packetData.count
+                    )
+                }
             }
 
-            // Continue reading.
+            // Continue reading immediately without waiting for processing.
             self.startReadingPackets()
         }
     }

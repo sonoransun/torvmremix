@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/user/extorvm/controller/internal/config"
@@ -83,6 +84,7 @@ type Engine struct {
 
 	state       State
 	savedNet    *network.SavedConfig
+	observerMu  sync.Mutex // guards observers and bootstrapObservers
 	observers   []StateObserver
 	retryPolicy map[State]*RetryPolicy
 	attempts    map[State]int
@@ -90,6 +92,8 @@ type Engine struct {
 
 // OnStateChange registers a callback for state transitions.
 func (e *Engine) OnStateChange(fn StateObserver) {
+	e.observerMu.Lock()
+	defer e.observerMu.Unlock()
 	e.observers = append(e.observers, fn)
 }
 
@@ -98,6 +102,8 @@ func (e *Engine) State() State { return e.state }
 
 // OnBootstrapProgress registers a callback for bootstrap progress updates.
 func (e *Engine) OnBootstrapProgress(fn BootstrapObserver) {
+	e.observerMu.Lock()
+	defer e.observerMu.Unlock()
 	e.bootstrapObservers = append(e.bootstrapObservers, fn)
 }
 
@@ -306,7 +312,12 @@ func (e *Engine) transition(next State) {
 	if e.Metrics != nil {
 		e.Metrics.RecordTransition(prev.String(), next.String())
 	}
-	for _, fn := range e.observers {
+	// Snapshot observers under lock to allow concurrent registration.
+	e.observerMu.Lock()
+	snap := make([]StateObserver, len(e.observers))
+	copy(snap, e.observers)
+	e.observerMu.Unlock()
+	for _, fn := range snap {
 		fn(prev, next)
 	}
 }
@@ -452,7 +463,11 @@ func (e *Engine) doWaitBootstrap(ctx context.Context) error {
 		if e.TorControl != nil {
 			status, err := e.TorControl.GetBootstrapStatus()
 			if err == nil {
-				for _, fn := range e.bootstrapObservers {
+				e.observerMu.Lock()
+				bsnap := make([]BootstrapObserver, len(e.bootstrapObservers))
+				copy(bsnap, e.bootstrapObservers)
+				e.observerMu.Unlock()
+				for _, fn := range bsnap {
 					fn(status.Progress, status.Summary)
 				}
 				if status.Progress >= 100 {

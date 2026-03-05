@@ -303,6 +303,16 @@ func main() {
 		}
 
 		app := gui.New(cfg, engine, logger, ring, *configFile)
+
+		// Signal handler for graceful shutdown in GUI mode.
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			sig := <-sigCh
+			logger.Info("received signal %v, shutting down GUI", sig)
+			app.RequestShutdown()
+		}()
+
 		app.Run()
 	}
 }

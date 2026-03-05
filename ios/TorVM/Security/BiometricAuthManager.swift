@@ -1,5 +1,6 @@
 import Foundation
 import LocalAuthentication
+import UIKit
 
 enum BiometricType {
     case faceID
@@ -16,6 +17,8 @@ enum BiometricType {
 final class BiometricAuthManager: ObservableObject {
 
     static let shared = BiometricAuthManager()
+
+    private var backgroundObserver: NSObjectProtocol?
 
     @Published var cacheDuration: TimeInterval = 300
     @Published var requireBiometricForVPN: Bool = true
@@ -74,6 +77,22 @@ final class BiometricAuthManager: ObservableObject {
 
     func clearCache() {
         lastAuthTime = nil
+    }
+
+    func registerForBackgroundNotification() {
+        backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.clearCache()
+        }
+    }
+
+    deinit {
+        if let observer = backgroundObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     func authenticateForVPN() async -> Bool {

@@ -71,8 +71,8 @@ COPY --from=kernel /boot/vmlinuz-* /vmlinuz
 
 # Create initramfs from rootfs
 RUN cd /rootfs && \
-    find . | cpio -o -H newc 2>/dev/null | gzip -6 > /initramfs.gz
+    find . | cpio -o -H newc 2>/dev/null | gzip -9 > /initramfs.gz
 
 # Create 64MB ext4 state image for persistent Tor data
 RUN truncate -s 64M /state.img && \
-    mkfs.ext4 -F -L torstate -q /state.img
+    mkfs.ext4 -F -L torstate -q -E lazy_itable_init=0,lazy_journal_init=0 /state.img

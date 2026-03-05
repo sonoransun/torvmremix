@@ -62,3 +62,8 @@ func (a *App) doQuit() {
 	}
 	a.fyneApp.Quit()
 }
+
+// RequestShutdown initiates a graceful shutdown from an external signal.
+func (a *App) RequestShutdown() {
+	a.doQuit()
+}

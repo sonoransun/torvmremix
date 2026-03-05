@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import NetworkExtension
+import os
 
 /// Relays DNS queries to an external DNS resolver (typically Tor's DNSPort)
 /// and injects the responses back into the TUN device.
@@ -18,7 +19,7 @@ final class DnsRelay {
     private static let dnsTimeoutSeconds: TimeInterval = 5
     private static let maxConcurrentQueries = 32
 
-    private let semaphore = DispatchSemaphore(value: DnsRelay.maxConcurrentQueries)
+    private let activeLock = os.OSAllocatedUnfairLock(initialState: Int(0))
     private let queue = DispatchQueue(label: "com.torvm.dns", attributes: .concurrent)
     private var isStopped = false
 
@@ -39,10 +40,20 @@ final class DnsRelay {
     /// Handle an intercepted DNS query packet.
     func handlePacket(ipHeader: IPv4Header, udpHeader: UdpHeader, payload: Data) {
         guard !isStopped else { return }
-        guard semaphore.wait(timeout: .now()) == .success else { return }
+
+        let allowed = activeLock.withLock { (count: inout Int) -> Bool in
+            guard count < Self.maxConcurrentQueries else { return false }
+            count += 1
+            return true
+        }
+        guard allowed else { return }
 
         queue.async { [weak self] in
-            defer { self?.semaphore.signal() }
+            defer {
+                self?.activeLock.withLock { (count: inout Int) in
+                    count -= 1
+                }
+            }
             guard let self = self, !self.isStopped else { return }
 
             do {
@@ -67,6 +78,8 @@ final class DnsRelay {
     }
 
     /// Forward a raw DNS query to the upstream resolver using NWConnection (UDP).
+    /// TODO: Replace synchronous semaphore-based NWConnection pattern with async/await
+    /// using withCheckedThrowingContinuation for better thread utilization.
     private func forwardQuerySync(_ query: Data) throws -> Data {
         guard query.count >= 2 else {
             throw DnsRelayError.queryTooShort

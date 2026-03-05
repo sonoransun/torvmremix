@@ -3,7 +3,7 @@
 # Source or run directly.
 
 if [ -z "$CLIENT_BLOCK_TCP_PORTS" ]; then
-  CLIENT_BLOCK_TCP_PORTS="445 139 138 137 53 25"
+  CLIENT_BLOCK_TCP_PORTS="445 389 3389 139 138 137 135 53 25"
 fi
 if [ -z "$TOR_TRANSPORT" ]; then
   TOR_TRANSPORT=9095
@@ -94,13 +94,16 @@ vmr_init() {
   iptables -t nat -A PREROUTING -j $cli_prenat_tbl >>"$LOG_TO" 2>&1
   iptables -t nat -N $cli_postnat_tbl >>"$LOG_TO" 2>&1
   iptables -t nat -A POSTROUTING -j $cli_postnat_tbl >>"$LOG_TO" 2>&1
+
+  # Block all IPv6 traffic to prevent Tor bypass
+  vmr_init_ipv6
 }
 
 vmr_logdrop() {
-  # log default drop targets
-  iptables -t filter -A INPUT -j LOG >>"$LOG_TO" 2>&1
-  iptables -t filter -A FORWARD -j LOG >>"$LOG_TO" 2>&1
-  iptables -t filter -A OUTPUT -j LOG >>"$LOG_TO" 2>&1
+  # log default drop targets with rate limiting to prevent log flooding
+  iptables -t filter -A INPUT -m limit --limit 5/min --limit-burst 10 -j LOG --log-prefix "vmr_INPUT_DROP: " >>"$LOG_TO" 2>&1
+  iptables -t filter -A FORWARD -m limit --limit 5/min --limit-burst 10 -j LOG --log-prefix "vmr_FORWARD_DROP: " >>"$LOG_TO" 2>&1
+  iptables -t filter -A OUTPUT -m limit --limit 5/min --limit-burst 10 -j LOG --log-prefix "vmr_OUTPUT_DROP: " >>"$LOG_TO" 2>&1
 }
 
 vmr_fwdsetup() {
@@ -117,7 +120,7 @@ vmr_fwdsetup() {
   done
   iptables -t nat -I $cli_postnat_tbl -o "$1" -j MASQUERADE >>"$LOG_TO" 2>&1
   iptables -t filter -I $host_filt_tbl -i "$1" -m state --state ESTABLISHED,RELATED -j ACCEPT >>"$LOG_TO" 2>&1
-  iptables -t filter -I OUTPUT -o "$1" -m owner --uid-owner 52 -j ACCEPT >>"$LOG_TO" 2>&1
+  iptables -t filter -I OUTPUT -o "$1" -p tcp -m owner --uid-owner 52 -j ACCEPT >>"$LOG_TO" 2>&1
   # reset the trap target at top of chain
   iptables -t filter -D OUTPUT -j $trap_tbl >>"$LOG_TO" 2>&1
   iptables -t filter -I OUTPUT -j $trap_tbl >>"$LOG_TO" 2>&1
@@ -192,4 +195,15 @@ vmr_setarp() {
     return "$FAIL"
   fi
   arp -i "$1" -s "$2" "$3" >>"$LOG_TO" 2>&1
+}
+
+vmr_init_ipv6() {
+  vmr_log "vmr_init_ipv6"
+  # Default DROP on all IPv6 chains to prevent Tor bypass via IPv6
+  ip6tables -t filter -P INPUT DROP >>"$LOG_TO" 2>&1
+  ip6tables -t filter -P FORWARD DROP >>"$LOG_TO" 2>&1
+  ip6tables -t filter -P OUTPUT DROP >>"$LOG_TO" 2>&1
+  # Allow only loopback
+  ip6tables -t filter -A INPUT -i lo -j ACCEPT >>"$LOG_TO" 2>&1
+  ip6tables -t filter -A OUTPUT -o lo -j ACCEPT >>"$LOG_TO" 2>&1
 }

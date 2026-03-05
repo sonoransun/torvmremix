@@ -308,10 +308,15 @@ class TcpSession(
             client.authPassword = isolationPassword
             val socket = client.connect(key.dstAddr, key.dstPort)
 
-            upstreamSocket = socket
-            upstreamInput = socket.getInputStream()
-            upstreamOutput = socket.getOutputStream()
-            upstreamConnected = true
+            try {
+                upstreamSocket = socket
+                upstreamInput = socket.getInputStream()
+                upstreamOutput = socket.getOutputStream()
+                upstreamConnected = true
+            } catch (e: Exception) {
+                socket.close()
+                throw e
+            }
 
             // If the three-way handshake ACK already arrived while we were
             // connecting, promote to ESTABLISHED now.
