@@ -2,6 +2,7 @@ package com.torvm.android.vpn
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
@@ -27,6 +28,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.Socket
 
 class TorVpnService : VpnService() {
 
@@ -39,9 +41,11 @@ class TorVpnService : VpnService() {
 
         const val ACTION_START = "com.torvm.android.vpn.START"
         const val ACTION_STOP = "com.torvm.android.vpn.STOP"
+        const val ACTION_NEW_IDENTITY = "com.torvm.android.vpn.NEW_IDENTITY"
 
         val state = MutableStateFlow(VpnState.DISCONNECTED)
         val errorMessage = MutableStateFlow<String?>(null)
+        val bootstrapProgress = MutableStateFlow<String?>(null)
     }
 
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -52,12 +56,17 @@ class TorVpnService : VpnService() {
     private var dnsRelay: DnsRelay? = null
     private var readJob: Job? = null
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var currentConfig: ConnectionConfig? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
                 stopVpn()
                 return START_NOT_STICKY
+            }
+            ACTION_NEW_IDENTITY -> {
+                sendNewIdentitySignal()
+                return START_STICKY
             }
             else -> {
                 startVpn()
@@ -72,8 +81,11 @@ class TorVpnService : VpnService() {
             try {
                 state.value = VpnState.CONNECTING
                 errorMessage.value = null
+                bootstrapProgress.value = "Initializing..."
+                updateNotification("Initializing...")
 
                 val config = loadConfig()
+                currentConfig = config
                 val vpnFd = createVpnInterface(config)
                 vpnInterface = vpnFd
 
@@ -89,9 +101,15 @@ class TorVpnService : VpnService() {
                     protect(socket)
                 }
 
+                bootstrapProgress.value = "Starting TCP session manager..."
+                updateNotification("Starting TCP session manager...")
+
                 tcpSessionManager = TcpSessionManager(
                     config.socksHost, config.socksPort, tunWriter!!, socketProtector
                 ).also { it.start() }
+
+                bootstrapProgress.value = "Starting DNS relay..."
+                updateNotification("Starting DNS relay...")
 
                 dnsRelay = DnsRelay(
                     config.dnsHost, config.dnsPort, tunWriter!!, datagramProtector
@@ -101,6 +119,8 @@ class TorVpnService : VpnService() {
 
                 startForeground(NOTIFICATION_ID, createNotification())
                 state.value = VpnState.CONNECTED
+                bootstrapProgress.value = null
+                updateNotification(getString(R.string.vpn_notification_text))
 
                 readJob = scope.launch {
                     val buffer = ByteArray(VPN_MTU)
@@ -134,8 +154,33 @@ class TorVpnService : VpnService() {
         vpnInterface = null
         scope.cancel()
         state.value = VpnState.DISCONNECTED
+        bootstrapProgress.value = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun sendNewIdentitySignal() {
+        val config = currentConfig ?: return
+        scope.launch {
+            try {
+                val socket = Socket(config.socksHost, 9051)
+                protect(socket)
+                val writer = socket.getOutputStream().bufferedWriter()
+                val reader = socket.getInputStream().bufferedReader()
+                writer.write("AUTHENTICATE \"\"\r\n")
+                writer.flush()
+                reader.readLine()
+                writer.write("SIGNAL NEWNYM\r\n")
+                writer.flush()
+                reader.readLine()
+                writer.write("QUIT\r\n")
+                writer.flush()
+                socket.close()
+                updateNotification("New identity requested")
+            } catch (_: Exception) {
+                // Signal failed; not critical
+            }
+        }
     }
 
     private fun createVpnInterface(config: ConnectionConfig): ParcelFileDescriptor {
@@ -192,12 +237,56 @@ class TorVpnService : VpnService() {
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(channel)
         }
+
+        val disconnectIntent = PendingIntent.getService(
+            this, 0,
+            Intent(this, TorVpnService::class.java).apply { action = ACTION_STOP },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val newIdentityIntent = PendingIntent.getService(
+            this, 1,
+            Intent(this, TorVpnService::class.java).apply { action = ACTION_NEW_IDENTITY },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.vpn_notification_title))
             .setContentText(getString(R.string.vpn_notification_text))
             .setSmallIcon(R.drawable.ic_vpn_key)
             .setOngoing(true)
+            .addAction(0, "New Identity", newIdentityIntent)
+            .addAction(0, "Disconnect", disconnectIntent)
             .build()
+    }
+
+    private fun updateNotification(text: String) {
+        try {
+            val nm = getSystemService(NotificationManager::class.java)
+
+            val disconnectIntent = PendingIntent.getService(
+                this, 0,
+                Intent(this, TorVpnService::class.java).apply { action = ACTION_STOP },
+                PendingIntent.FLAG_IMMUTABLE
+            )
+            val newIdentityIntent = PendingIntent.getService(
+                this, 1,
+                Intent(this, TorVpnService::class.java).apply { action = ACTION_NEW_IDENTITY },
+                PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle(getString(R.string.vpn_notification_title))
+                .setContentText(text)
+                .setSmallIcon(R.drawable.ic_vpn_key)
+                .setOngoing(true)
+                .addAction(0, "New Identity", newIdentityIntent)
+                .addAction(0, "Disconnect", disconnectIntent)
+                .build()
+
+            nm.notify(NOTIFICATION_ID, notification)
+        } catch (_: Exception) {
+            // Notification update is best-effort
+        }
     }
 
     override fun onDestroy() {

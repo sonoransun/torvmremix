@@ -25,6 +25,8 @@ struct ConnectionCard: View {
             }
             .padding(.top, 4)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Connection details. SOCKS5: \(config.socksHost) port \(config.socksPort). DNS: \(config.dnsHost) port \(config.dnsPort).")
     }
 }
 

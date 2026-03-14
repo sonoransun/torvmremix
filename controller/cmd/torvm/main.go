@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -19,6 +20,7 @@ import (
 	"github.com/user/extorvm/controller/internal/metrics"
 	"github.com/user/extorvm/controller/internal/platform"
 	"github.com/user/extorvm/controller/internal/systemd"
+	"github.com/user/extorvm/controller/internal/tor"
 	"github.com/user/extorvm/controller/internal/winsvc"
 )
 
@@ -30,11 +32,14 @@ func main() {
 		configFile       = flag.String("config", "", "path to JSON config file")
 		clean            = flag.Bool("clean", false, "remove state disk before starting")
 		replace          = flag.Bool("replace", false, "replace existing state disk with fresh copy")
-		serviceInstall   = flag.Bool("service-install", false, "install as system service (macOS launchd / Windows SCM) and exit")
-		serviceUninstall = flag.Bool("service-uninstall", false, "uninstall system service (macOS launchd / Windows SCM) and exit")
+		serviceInstall   = flag.Bool("service-install", false, "install as system service and exit")
+		serviceUninstall = flag.Bool("service-uninstall", false, "uninstall system service and exit")
 		serviceRun       = flag.Bool("service-run", false, "run as Windows service (used by SCM, not for manual invocation)")
 		metricsAddr      = flag.String("metrics-addr", "", "address for metrics/health HTTP server (e.g. 127.0.0.1:9100)")
 		logFormat        = flag.String("log-format", "", "log format: text (default) or json")
+		logFile          = flag.String("log-file", "", "path to log file (in addition to stderr)")
+		timeout          = flag.Duration("timeout", 0, "maximum runtime duration; 0 means unlimited")
+		status           = flag.Bool("status", false, "query running instance status and exit")
 		version          = flag.Bool("version", false, "print version and exit")
 	)
 	flag.Parse()
@@ -50,6 +55,8 @@ func main() {
 		switch runtime.GOOS {
 		case "darwin":
 			err = launchd.Install(false)
+		case "linux":
+			err = systemd.Install()
 		case "windows":
 			err = winsvc.InstallService()
 		default:
@@ -68,6 +75,8 @@ func main() {
 		switch runtime.GOOS {
 		case "darwin":
 			err = launchd.Uninstall()
+		case "linux":
+			err = systemd.Uninstall()
 		case "windows":
 			err = winsvc.RemoveService()
 		default:
@@ -86,6 +95,12 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: load config: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Handle --status: query running instance and exit.
+	if *status {
+		exitCode := queryStatus(cfg)
+		os.Exit(exitCode)
 	}
 
 	cfg.Verbose = *verboseFlag
@@ -110,6 +125,7 @@ func main() {
 
 	logger, err := logging.NewLogger(logging.Options{
 		Verbose: cfg.Verbose,
+		LogFile: *logFile,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: create logger: %v\n", err)
@@ -143,19 +159,29 @@ func main() {
 	// endpoint can report live state.
 	var engineRef *lifecycle.Engine
 
+	startTime := time.Now()
+	var lastError string
+
 	if *metricsAddr != "" {
 		healthFn := func() metrics.HealthStatus {
 			if engineRef == nil {
-				return metrics.HealthStatus{State: "Init", Bootstrap: 0, Failsafe: false}
+				return metrics.HealthStatus{
+					State:   "Init",
+					Version: "0.1.0",
+				}
 			}
 			bootstrap := 0
 			if engineRef.State() == lifecycle.StateRunning {
 				bootstrap = 100
 			}
 			return metrics.HealthStatus{
-				State:     engineRef.State().String(),
-				Bootstrap: bootstrap,
-				Failsafe:  engineRef.FailSafe.IsActive(),
+				State:            engineRef.State().String(),
+				Bootstrap:        bootstrap,
+				Failsafe:         engineRef.FailSafe.IsActive(),
+				UptimeSeconds:    int(time.Since(startTime).Seconds()),
+				BootstrapPercent: bootstrap,
+				LastError:        lastError,
+				Version:          "0.1.0",
 			}
 		}
 		metricsSrv, mErr := metrics.NewServer(*metricsAddr, reg, healthFn)
@@ -176,7 +202,14 @@ func main() {
 
 	if *headless {
 		// CLI mode: blocking lifecycle with optional systemd integration.
-		ctx, cancel := context.WithCancel(context.Background())
+		var ctx context.Context
+		var cancel context.CancelFunc
+		if *timeout > 0 {
+			ctx, cancel = context.WithTimeout(context.Background(), *timeout)
+			logger.Info("maximum runtime set to %v", *timeout)
+		} else {
+			ctx, cancel = context.WithCancel(context.Background())
+		}
 		defer cancel()
 
 		// If running under systemd, attach journal writer and set up notifications.
@@ -265,6 +298,7 @@ func main() {
 		}
 
 		if err := engine.Run(ctx); err != nil {
+			lastError = err.Error()
 			logger.Error("lifecycle error: %v", err)
 			os.Exit(1)
 		}
@@ -315,4 +349,40 @@ func main() {
 
 		app.Run()
 	}
+}
+
+// queryStatus connects to a running TorVM instance and prints its status.
+// Returns 0 if running, 1 if not running or error.
+func queryStatus(cfg *config.Config) int {
+	vmAddr := fmt.Sprintf("%s:%d", cfg.VMIP, cfg.ControlPort)
+
+	// Check if VM control port is reachable.
+	conn, err := net.DialTimeout("tcp", vmAddr, 3*time.Second)
+	if err != nil {
+		fmt.Println("TorVM Status: Stopped")
+		fmt.Printf("  (could not reach %s)\n", vmAddr)
+		return 1
+	}
+	if tc, ok := conn.(*net.TCPConn); ok {
+		tc.SetLinger(0)
+	}
+	conn.Close()
+
+	fmt.Println("TorVM Status: Running")
+	fmt.Printf("  SOCKS Port: %d\n", cfg.SOCKSPort)
+
+	// Try to get bootstrap status via Tor Control.
+	ctrlAddr := fmt.Sprintf("%s:%d", cfg.VMIP, cfg.ControlPort)
+	client, err := tor.NewControlClient(ctrlAddr, 5*time.Second)
+	if err == nil {
+		defer client.Close()
+		if err := client.Authenticate(""); err == nil {
+			status, err := client.GetBootstrapStatus()
+			if err == nil {
+				fmt.Printf("  Bootstrap: %d%% - %s\n", status.Progress, status.Summary)
+			}
+		}
+	}
+
+	return 0
 }

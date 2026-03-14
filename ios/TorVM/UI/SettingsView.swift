@@ -29,6 +29,16 @@ struct SettingsView: View {
         )
     }
 
+    private var cacheDurationText: String {
+        switch bioAuth.cacheDuration {
+        case 60: return "1 minute"
+        case 300: return "5 minutes"
+        case 900: return "15 minutes"
+        case 0: return "Never"
+        default: return "\(Int(bioAuth.cacheDuration)) seconds"
+        }
+    }
+
     var body: some View {
         Form {
             Section("Presets") {
@@ -37,10 +47,15 @@ struct SettingsView: View {
                         applyPreset(.direct)
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel("Direct TAP preset")
+                    .accessibilityHint("Double tap to apply the direct TAP connection preset.")
+
                     Button("WiFi/LAN") {
                         applyPreset(.wifiDefault)
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel("WiFi LAN preset")
+                    .accessibilityHint("Double tap to apply the WiFi and LAN connection preset.")
                 }
             }
 
@@ -49,14 +64,22 @@ struct SettingsView: View {
                     .textContentType(.URL)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                    .accessibilityLabel("SOCKS5 Host")
+                    .accessibilityValue(socksHost.isEmpty ? "empty" : socksHost)
                 TextField("SOCKS5 Port", text: $socksPort)
                     .keyboardType(.numberPad)
+                    .accessibilityLabel("SOCKS5 Port")
+                    .accessibilityValue(socksPort.isEmpty ? "empty" : socksPort)
                 TextField("DNS Host", text: $dnsHost)
                     .textContentType(.URL)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                    .accessibilityLabel("DNS Host")
+                    .accessibilityValue(dnsHost.isEmpty ? "empty" : dnsHost)
                 TextField("DNS Port", text: $dnsPort)
                     .keyboardType(.numberPad)
+                    .accessibilityLabel("DNS Port")
+                    .accessibilityValue(dnsPort.isEmpty ? "empty" : dnsPort)
             }
 
             Section("Security") {
@@ -67,6 +90,10 @@ struct SettingsView: View {
                         bioAuth.savePreferences()
                     }
                 ))
+                .accessibilityLabel("Require biometric for VPN")
+                .accessibilityValue(bioAuth.requireBiometricForVPN ? "enabled" : "disabled")
+                .accessibilityHint("Double tap to \(bioAuth.requireBiometricForVPN ? "disable" : "enable") biometric requirement for VPN toggling.")
+
                 Toggle("Require biometric for settings", isOn: Binding(
                     get: { bioAuth.requireBiometricForSettings },
                     set: {
@@ -74,18 +101,28 @@ struct SettingsView: View {
                         bioAuth.savePreferences()
                     }
                 ))
+                .accessibilityLabel("Require biometric for settings")
+                .accessibilityValue(bioAuth.requireBiometricForSettings ? "enabled" : "disabled")
+                .accessibilityHint("Double tap to \(bioAuth.requireBiometricForSettings ? "disable" : "enable") biometric requirement for saving settings.")
+
                 Picker("Cache duration", selection: cacheDurationBinding) {
                     Text("1 minute").tag(TimeInterval(60))
                     Text("5 minutes").tag(TimeInterval(300))
                     Text("15 minutes").tag(TimeInterval(900))
                     Text("Never").tag(TimeInterval(0))
                 }
+                .accessibilityLabel("Biometric cache duration")
+                .accessibilityValue(cacheDurationText)
+                .accessibilityHint("Currently set to \(cacheDurationText). Double tap to change.")
+
                 HStack {
                     Text("Biometric type")
                     Spacer()
                     Text(biometricLabel)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Biometric type: \(biometricLabel)")
             }
 
             Section("Firewall") {
@@ -109,6 +146,8 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityLabel("Save settings")
+                .accessibilityHint("Double tap to save the current connection and security settings.")
             }
         }
         .navigationTitle("Settings")

@@ -26,6 +26,7 @@ var hotReloadableFields = map[string]bool{
 	"Bridge":  true,
 	"Proxy":   true,
 	"Verbose": true,
+	"Relays":  true,
 }
 
 // Diff compares old and new Config and returns a ConfigDiff describing what

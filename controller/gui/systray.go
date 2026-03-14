@@ -18,6 +18,10 @@ func (a *App) setupSystemTray() {
 
 // buildTrayMenu creates the system tray menu with current state.
 func (a *App) buildTrayMenu() *fyne.Menu {
+	// State label at the top (disabled, informational only).
+	stateItem := fyne.NewMenuItem("TorVM: "+a.engine.State().String(), nil)
+	stateItem.Disabled = true
+
 	showItem := fyne.NewMenuItem("Show Window", func() {
 		a.window.Show()
 		a.window.RequestFocus()
@@ -38,11 +42,31 @@ func (a *App) buildTrayMenu() *fyne.Menu {
 		})
 	}
 
+	// New Identity: request a new Tor circuit.
+	newIdentityItem := fyne.NewMenuItem("New Identity", func() {
+		if err := a.engine.NewIdentity(); err != nil {
+			a.logger.Error("new identity: %v", err)
+		} else {
+			a.logger.Info("Tor identity renewed via tray")
+		}
+	})
+	if a.engine.State() != lifecycle.StateRunning {
+		newIdentityItem.Disabled = true
+	}
+
 	quitItem := fyne.NewMenuItem("Quit", func() {
 		a.doQuit()
 	})
 
-	return fyne.NewMenu("TorVM", showItem, toggleItem, fyne.NewMenuItemSeparator(), quitItem)
+	return fyne.NewMenu("TorVM",
+		stateItem,
+		fyne.NewMenuItemSeparator(),
+		showItem,
+		toggleItem,
+		newIdentityItem,
+		fyne.NewMenuItemSeparator(),
+		quitItem,
+	)
 }
 
 // refreshTrayMenu rebuilds the tray menu to reflect current state.

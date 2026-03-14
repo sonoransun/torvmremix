@@ -12,9 +12,14 @@ import (
 
 // HealthStatus is the JSON response for /healthz.
 type HealthStatus struct {
-	State     string `json:"state"`
-	Bootstrap int    `json:"bootstrap"`
-	Failsafe  bool   `json:"failsafe"`
+	State            string `json:"state"`
+	Bootstrap        int    `json:"bootstrap"`
+	Failsafe         bool   `json:"failsafe"`
+	UptimeSeconds    int    `json:"uptime_seconds"`
+	BootstrapPercent int    `json:"tor_bootstrap_percent"`
+	VMPID            int    `json:"vm_pid"`
+	LastError        string `json:"last_error,omitempty"`
+	Version          string `json:"version"`
 }
 
 // HealthFunc returns the current health status.

@@ -263,6 +263,106 @@ func TestTorrcOverlayUnsupportedTransport(t *testing.T) {
 	}
 }
 
+func TestValidateRelayEntry(t *testing.T) {
+	tests := []struct {
+		name    string
+		entry   string
+		wantErr bool
+	}{
+		{"valid fingerprint", "$ABCDEF0123456789ABCDEF0123456789ABCDEF01", false},
+		{"valid fingerprint lowercase", "$abcdef0123456789abcdef0123456789abcdef01", false},
+		{"valid country code", "{US}", false},
+		{"valid country code lowercase", "{de}", false},
+		{"fingerprint too short", "$ABCDEF", true},
+		{"fingerprint too long", "$ABCDEF0123456789ABCDEF0123456789ABCDEF01FF", true},
+		{"fingerprint no dollar", "ABCDEF0123456789ABCDEF0123456789ABCDEF01", true},
+		{"country code no braces", "US", true},
+		{"country code three letters", "{USA}", true},
+		{"country code one letter", "{U}", true},
+		{"empty", "", true},
+		{"newline injection", "$ABCDEF0123456789ABCDEF0123456789ABCDEF01\n", true},
+		{"country code with digits", "{U1}", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRelayEntry(tt.entry)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateRelayEntry(%q): got err=%v, wantErr=%v", tt.entry, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestTorrcOverlayExcludeNodes(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Relays.ExcludeNodes = []string{
+		"$ABCDEF0123456789ABCDEF0123456789ABCDEF01",
+		"{US}",
+	}
+
+	overlay, err := cfg.TorrcOverlay()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expected := "ExcludeNodes $ABCDEF0123456789ABCDEF0123456789ABCDEF01,{US}"
+	if !strings.Contains(overlay, expected) {
+		t.Errorf("expected %q in overlay, got %q", expected, overlay)
+	}
+}
+
+func TestTorrcOverlayExcludeExitNodes(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Relays.ExcludeExitNodes = []string{"{DE}", "{FR}"}
+
+	overlay, err := cfg.TorrcOverlay()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(overlay, "ExcludeExitNodes {DE},{FR}") {
+		t.Errorf("expected ExcludeExitNodes line in overlay, got %q", overlay)
+	}
+}
+
+func TestTorrcOverlayStrictNodes(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Relays.ExcludeNodes = []string{"{RU}"}
+	cfg.Relays.StrictNodes = true
+
+	overlay, err := cfg.TorrcOverlay()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(overlay, "ExcludeNodes {RU}") {
+		t.Error("expected ExcludeNodes line")
+	}
+	if !strings.Contains(overlay, "StrictNodes 1") {
+		t.Error("expected StrictNodes 1 line")
+	}
+}
+
+func TestTorrcOverlayStrictNodesAloneNoOutput(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Relays.StrictNodes = true
+	// StrictNodes alone without any ExcludeNodes should still emit.
+	overlay, err := cfg.TorrcOverlay()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(overlay, "StrictNodes 1") {
+		t.Error("expected StrictNodes 1 line even without exclusion entries")
+	}
+}
+
+func TestTorrcOverlayInvalidRelay(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Relays.ExcludeNodes = []string{"not-valid"}
+
+	_, err := cfg.TorrcOverlay()
+	if err == nil {
+		t.Error("expected error for invalid relay entry")
+	}
+}
+
 func TestTorrcOverlayBridgeAndProxy(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Bridge.UseBridges = true

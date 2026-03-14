@@ -12,6 +12,12 @@ import (
 // This rejects control characters and most shell-special characters.
 var bridgeLineRe = regexp.MustCompile(`^[a-zA-Z0-9.:[\] /=,+_-]+$`)
 
+// fingerprintRe matches a Tor relay fingerprint: $ followed by 40 hex characters.
+var fingerprintRe = regexp.MustCompile(`^\$[0-9a-fA-F]{40}$`)
+
+// countryCodeRe matches a Tor country code selector: {XX} where XX is two letters.
+var countryCodeRe = regexp.MustCompile(`^\{[a-zA-Z]{2}\}$`)
+
 // credentialRe validates proxy username/password characters. Only allows
 // printable ASCII excluding characters that could break torrc parsing.
 var credentialRe = regexp.MustCompile(`^[a-zA-Z0-9!@#$%^&*()_+=[\]{}<>,.?/~-]+$`)
@@ -82,7 +88,34 @@ func validateCredential(field, value string) error {
 	return nil
 }
 
-// TorrcOverlay generates torrc configuration lines from Bridge and Proxy settings.
+// validateRelayEntry validates a single relay exclusion entry.
+// Accepts either a fingerprint ($hex40) or country code ({XX}).
+func validateRelayEntry(entry string) error {
+	if err := sanitizeTorrcLine("relay entry", entry); err != nil {
+		return err
+	}
+	if !fingerprintRe.MatchString(entry) && !countryCodeRe.MatchString(entry) {
+		return fmt.Errorf("relay entry %q must be a fingerprint ($hex40) or country code ({XX})", entry)
+	}
+	return nil
+}
+
+// validateRelayConfig validates all entries in a RelayConfig.
+func validateRelayConfig(rc *RelayConfig) error {
+	for _, e := range rc.ExcludeNodes {
+		if err := validateRelayEntry(e); err != nil {
+			return fmt.Errorf("ExcludeNodes: %w", err)
+		}
+	}
+	for _, e := range rc.ExcludeExitNodes {
+		if err := validateRelayEntry(e); err != nil {
+			return fmt.Errorf("ExcludeExitNodes: %w", err)
+		}
+	}
+	return nil
+}
+
+// TorrcOverlay generates torrc configuration lines from Bridge, Proxy, and Relay settings.
 // Returns an empty string and nil error if no overlay is needed.
 func (c *Config) TorrcOverlay() (string, error) {
 	var lines []string
@@ -145,6 +178,20 @@ func (c *Config) TorrcOverlay() (string, error) {
 				lines = append(lines, fmt.Sprintf("Socks5ProxyPassword %s", c.Proxy.Password))
 			}
 		}
+	}
+
+	// Relay exclusion configuration.
+	if err := validateRelayConfig(&c.Relays); err != nil {
+		return "", err
+	}
+	if len(c.Relays.ExcludeNodes) > 0 {
+		lines = append(lines, fmt.Sprintf("ExcludeNodes %s", strings.Join(c.Relays.ExcludeNodes, ",")))
+	}
+	if len(c.Relays.ExcludeExitNodes) > 0 {
+		lines = append(lines, fmt.Sprintf("ExcludeExitNodes %s", strings.Join(c.Relays.ExcludeExitNodes, ",")))
+	}
+	if c.Relays.StrictNodes {
+		lines = append(lines, "StrictNodes 1")
 	}
 
 	if len(lines) == 0 {

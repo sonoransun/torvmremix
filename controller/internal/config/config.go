@@ -96,6 +96,13 @@ type EntropyConfig struct {
 	KernelEntropyBytes int `json:"kernel_entropy_bytes"`
 }
 
+// RelayConfig holds relay exclusion settings for Tor circuit selection.
+type RelayConfig struct {
+	ExcludeNodes     []string `json:"exclude_nodes"`      // $fingerprint or {CC} entries
+	ExcludeExitNodes []string `json:"exclude_exit_nodes"`  // same format, exit-only
+	StrictNodes      bool     `json:"strict_nodes"`        // Tor StrictNodes 1|0
+}
+
 // Config holds all configuration for the TorVM controller.
 type Config struct {
 	TAPName       string `json:"tap_name"`
@@ -127,6 +134,7 @@ type Config struct {
 	Service       ServiceConfig `json:"service"`
 	Retry         RetryConfig   `json:"retry"`
 	Entropy       EntropyConfig `json:"entropy"`
+	Relays        RelayConfig   `json:"relays"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.

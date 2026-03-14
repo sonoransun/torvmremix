@@ -1,8 +1,13 @@
 package tor
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 )
+
+// circuitIDRe validates a circuit ID (numeric only).
+var circuitIDRe = regexp.MustCompile(`^[0-9]+$`)
 
 // CircuitInfo represents a Tor circuit.
 type CircuitInfo struct {
@@ -34,6 +39,18 @@ func (c *ControlClient) GetCircuits() ([]CircuitInfo, error) {
 		circuits = append(circuits, ci)
 	}
 	return circuits, nil
+}
+
+// CloseCircuit terminates the circuit with the given numeric ID.
+func (c *ControlClient) CloseCircuit(circuitID string) error {
+	if !circuitIDRe.MatchString(circuitID) {
+		return fmt.Errorf("tor: invalid circuit ID %q", circuitID)
+	}
+	lines, err := c.sendCommand("CLOSECIRCUIT " + circuitID)
+	if err != nil {
+		return err
+	}
+	return expectOK(lines)
 }
 
 // parseCircuitLine parses a single circuit-status line.

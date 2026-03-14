@@ -96,7 +96,7 @@ func (a *App) statusTab() fyne.CanvasObject {
 // updateStatus is called by the observer to update the status tab.
 func (a *App) updateStatus(_, to lifecycle.State) {
 	a.statusLight.SetState(to)
-	a.stateLabel.SetText(to.String())
+	a.stateLabel.SetText(a.statusLight.Description())
 }
 
 // pollServiceStatus queries launchd and updates the status widgets.

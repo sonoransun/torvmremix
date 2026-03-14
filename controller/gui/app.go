@@ -38,6 +38,7 @@ type App struct {
 	modeLabel      *widget.Label
 	bootstrapBar   *widget.ProgressBar
 	bootstrapLabel *widget.Label
+	tabs           *container.AppTabs
 }
 
 // New creates a GUI application.
@@ -61,29 +62,48 @@ func (a *App) Run() {
 	st := launchd.QueryStatus()
 	a.serviceMode = st.Installed
 
+	// Restore saved window size from preferences.
+	prefs := a.fyneApp.Preferences()
+	if w := prefs.FloatWithFallback("window.width", 0); w > 0 {
+		h := prefs.FloatWithFallback("window.height", 0)
+		if h > 0 {
+			a.window.Resize(fyne.NewSize(float32(w), float32(h)))
+		}
+	}
+
 	// Register lifecycle observer for UI updates.
 	a.engine.OnStateChange(func(from, to lifecycle.State) {
 		a.updateStatus(from, to)
 		a.refreshTrayMenu()
+
+		// Show error dialog when entering Failed state with recovery options.
+		if to == lifecycle.StateFailed {
+			a.showFailedDialog()
+		}
 	})
 
-	tabs := container.NewAppTabs(
+	a.tabs = container.NewAppTabs(
 		container.NewTabItem("Status", a.statusTab()),
 		container.NewTabItem("Bridges", a.bridgesTab()),
 		container.NewTabItem("Proxy", a.proxyTab()),
+		container.NewTabItem("Relays", a.relaysTab()),
+		container.NewTabItem("Circuits", a.circuitsTab()),
 		container.NewTabItem("Settings", a.settingsTab()),
 		container.NewTabItem("Logs", a.logTab()),
 	)
 
-	// Conditionally add Service tab (macOS only — returns nil on other platforms).
+	// Conditionally add Service tab (returns nil on unsupported platforms).
 	if svcTab := a.serviceTab(); svcTab != nil {
-		tabs.Append(container.NewTabItem("Service", svcTab))
+		a.tabs.Append(container.NewTabItem("Service", svcTab))
 	}
 
-	a.window.SetContent(tabs)
+	a.window.SetContent(a.tabs)
 
-	// Minimize to tray on close instead of quitting.
+	// Minimize to tray on close instead of quitting. Save window size.
 	a.window.SetCloseIntercept(func() {
+		size := a.window.Canvas().Size()
+		prefs.SetFloat("window.width", float64(size.Width))
+		prefs.SetFloat("window.height", float64(size.Height))
 		a.window.Hide()
 	})
 
@@ -122,6 +142,31 @@ func (a *App) startVM() {
 			dialog.ShowError(err, a.window)
 		}
 	}()
+}
+
+// showFailedDialog displays an error dialog with recovery options.
+func (a *App) showFailedDialog() {
+	retryBtn := widget.NewButton("Retry", func() {
+		a.startVM()
+	})
+	logsBtn := widget.NewButton("View Logs", func() {
+		// Switch to the Logs tab by name.
+		if a.tabs != nil {
+			for i, item := range a.tabs.Items {
+				if item.Text == "Logs" {
+					a.tabs.SelectIndex(i)
+					break
+				}
+			}
+		}
+	})
+	content := container.NewVBox(
+		widget.NewLabel("TorVM encountered an error and could not continue."),
+		widget.NewLabel("Check the logs for details, or retry."),
+		container.NewHBox(retryBtn, logsBtn),
+	)
+	d := dialog.NewCustom("TorVM Error", "Close", content, a.window)
+	d.Show()
 }
 
 // stopVM signals the lifecycle engine to shut down,
