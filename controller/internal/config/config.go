@@ -96,6 +96,22 @@ type EntropyConfig struct {
 	KernelEntropyBytes int `json:"kernel_entropy_bytes"`
 }
 
+// BrowserConfig holds settings for the hardened Chromium browser VM.
+type BrowserConfig struct {
+	Enabled           bool   `json:"browser_enabled"`
+	VMMemoryMB        int    `json:"browser_vm_memory_mb"`
+	VMCPUs            int    `json:"browser_vm_cpus"`
+	KernelPath        string `json:"browser_kernel_path"`
+	InitrdPath        string `json:"browser_initrd_path"`
+	StateDiskPath     string `json:"browser_state_disk_path"`
+	QMPSocketPath     string `json:"browser_qmp_socket_path"`
+	VNCDisplay        int    `json:"browser_vnc_display"`       // 0 = disabled, 1 → port 5901
+	AutoStart         bool   `json:"browser_auto_start"`        // start when Tor reaches Running
+	CanaryIntervalSec int    `json:"canary_interval_sec"`       // secwatchd canary check period
+	HoneyTokens       bool   `json:"honey_tokens_enabled"`
+	AutoRemediate     bool   `json:"auto_remediate"`            // kill+restart on breach
+}
+
 // RelayConfig holds relay exclusion settings for Tor circuit selection.
 type RelayConfig struct {
 	ExcludeNodes     []string `json:"exclude_nodes"`      // $fingerprint or {CC} entries
@@ -135,6 +151,7 @@ type Config struct {
 	Retry         RetryConfig   `json:"retry"`
 	Entropy       EntropyConfig `json:"entropy"`
 	Relays        RelayConfig   `json:"relays"`
+	Browser       BrowserConfig `json:"browser"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -174,6 +191,20 @@ func DefaultConfig() *Config {
 			VirtioRNGMaxBytes:  1024,
 			VirtioRNGPeriod:    1000,
 			KernelEntropyBytes: 64,
+		},
+		Browser: BrowserConfig{
+			Enabled:           false,
+			VMMemoryMB:        512,
+			VMCPUs:            2,
+			KernelPath:        filepath.Join("dist", "browservm", "vmlinuz"),
+			InitrdPath:        filepath.Join("dist", "browservm", "initramfs.gz"),
+			StateDiskPath:     filepath.Join("dist", "browservm", "state.img"),
+			QMPSocketPath:     defaultBrowserQMPPath(),
+			VNCDisplay:        1,
+			AutoStart:         true,
+			CanaryIntervalSec: 5,
+			HoneyTokens:       true,
+			AutoRemediate:     true,
 		},
 	}
 }
@@ -325,6 +356,32 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Validate browser VM settings if enabled.
+	if c.Browser.Enabled {
+		if c.Browser.VMMemoryMB < 256 || c.Browser.VMMemoryMB > 4096 {
+			return fmt.Errorf("Browser.VMMemoryMB must be 256-4096, got %d", c.Browser.VMMemoryMB)
+		}
+		if c.Browser.VMCPUs < 1 || c.Browser.VMCPUs > 8 {
+			return fmt.Errorf("Browser.VMCPUs must be 1-8, got %d", c.Browser.VMCPUs)
+		}
+		if c.Browser.VNCDisplay < 0 || c.Browser.VNCDisplay > 99 {
+			return fmt.Errorf("Browser.VNCDisplay must be 0-99, got %d", c.Browser.VNCDisplay)
+		}
+		if c.Browser.CanaryIntervalSec < 1 || c.Browser.CanaryIntervalSec > 300 {
+			return fmt.Errorf("Browser.CanaryIntervalSec must be 1-300, got %d", c.Browser.CanaryIntervalSec)
+		}
+		for _, pair := range []struct{ name, val string }{
+			{"Browser.KernelPath", c.Browser.KernelPath},
+			{"Browser.InitrdPath", c.Browser.InitrdPath},
+			{"Browser.StateDiskPath", c.Browser.StateDiskPath},
+			{"Browser.QMPSocketPath", c.Browser.QMPSocketPath},
+		} {
+			if pair.val == "" {
+				return fmt.Errorf("%s must not be empty", pair.name)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -340,4 +397,11 @@ func defaultQMPPath() string {
 		return `\\.\pipe\torvm-qmp`
 	}
 	return "/run/torvm/qmp.sock"
+}
+
+func defaultBrowserQMPPath() string {
+	if runtime.GOOS == "windows" {
+		return `\\.\pipe\torvm-browser-qmp`
+	}
+	return "/run/torvm/browser-qmp.sock"
 }

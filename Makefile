@@ -1,9 +1,12 @@
-.PHONY: all vm controller ios install clean test test-integration lint
+.PHONY: all vm browservm controller ios install clean test test-integration lint
 
-all: vm controller
+all: vm browservm controller
 
 vm:
 	@scripts/build-vm.sh
+
+browservm:
+	@scripts/build-browservm.sh
 
 controller:
 	@scripts/build-controller.sh

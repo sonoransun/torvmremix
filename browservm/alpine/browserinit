@@ -1,0 +1,167 @@
+#!/bin/sh
+# Browser VM init script (PID 1).
+# Launches hardened Chromium under seccomp with security monitoring.
+
+d() { echo "    ${1}"; }
+dn() { echo -n "    ${1}"; }
+
+umask 077
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+
+if [ ! -d /proc/self ]; then
+  d "ERROR: unable to access /proc, aborting init."
+  exec /bin/sh
+fi
+
+ARGS=$(cat /proc/cmdline)
+ARGS="_ $ARGS _"
+
+get_param() {
+  echo "$ARGS" | sed "s/.* ${1}=//" | sed 's/ .*//'
+}
+get_param_safe() {
+  echo "$ARGS" | sed "s/.* ${1}=//" | sed 's/ .*//' | sed "s/[^${2}]//g"
+}
+has_param() {
+  echo "$ARGS" | grep " ${1}" >/dev/null 2>&1
+}
+
+clear; echo
+d "Initializing Browser VM ..."
+
+mkdir -p /dev/pts /dev/shm
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /dev/shm
+
+# Parse parameters.
+TORIP=$(get_param_safe TORIP '0-9.')
+SOCKSPORT=$(get_param_safe SOCKSPORT '0-9')
+DNSPORT=$(get_param_safe DNSPORT '0-9')
+CANARY_INTERVAL=$(get_param_safe CANARY_INTERVAL '0-9')
+
+[ -z "$TORIP" ] && TORIP="10.10.10.1"
+[ -z "$SOCKSPORT" ] && SOCKSPORT="9050"
+[ -z "$DNSPORT" ] && DNSPORT="9093"
+[ -z "$CANARY_INTERVAL" ] && CANARY_INTERVAL="5"
+
+export TORIP SOCKSPORT DNSPORT CANARY_INTERVAL
+
+# Apply kernel hardening.
+[ -f /etc/sysctl.conf ] && sysctl -p >&- 2>&-
+
+# Seed entropy.
+if has_param 'ENTROPY='; then
+  ENTROPY=$(get_param_safe ENTROPY '0-9a-fA-F')
+  echo "$ENTROPY" > /dev/urandom 2>/dev/null
+fi
+if [ -c /dev/hwrng ]; then
+  timeout 5 head -c 2048 /dev/hwrng > /dev/urandom 2>/dev/null
+fi
+sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
+
+# Mount state disk for persistent browser profile.
+hddev=/dev/vda
+[ -e /dev/vda1 ] && hddev=/dev/vda1
+mkdir -p /home
+if [ -e "$hddev" ]; then
+  mount -onoatime,nodiratime "$hddev" /home 2>/dev/null
+  mkdir -p /home/browser
+  chown 1000:1000 /home/browser
+fi
+
+# Set up networking (QEMU user-mode provides DHCP on eth0).
+ip link set lo up
+ip addr add 127.0.0.1/8 dev lo
+
+ip link set eth0 up
+dn "Getting DHCP lease ..."
+udhcpc -b -i eth0 -p /var/run/dhcp.eth0.pid >/dev/null 2>&1 &
+maxrt=15
+while [ $maxrt -gt 0 ]; do
+  sleep 1
+  ip addr show eth0 | grep 'inet ' >/dev/null 2>&1 && break
+  echo -n "."
+  maxrt=$(expr $maxrt - 1)
+done
+echo " done."
+
+# Apply firewall rules (restrict to SOCKS + DNS only).
+. /sbin/browserrouter.sh
+d "Firewall: traffic restricted to SOCKS5 ($TORIP:$SOCKSPORT) and DNS ($TORIP:$DNSPORT)"
+
+# Plant honey token files if enabled.
+if has_param 'HONEY_TOKENS='; then
+  d "Planting honey token files ..."
+  mkdir -p /home/browser/.ssh /home/browser/.aws /home/browser/.config/chromium
+  cp /etc/honeytokens/id_rsa /home/browser/.ssh/id_rsa 2>/dev/null
+  cp /etc/honeytokens/credentials /home/browser/.aws/credentials 2>/dev/null
+  cp /etc/honeytokens/login_data.bak "/home/browser/.config/chromium/Login Data.bak" 2>/dev/null
+  chmod 600 /home/browser/.ssh/id_rsa 2>/dev/null
+  chown -R 1000:1000 /home/browser/.ssh /home/browser/.aws /home/browser/.config 2>/dev/null
+fi
+
+# Start Xvfb (virtual framebuffer for Chromium).
+d "Starting Xvfb ..."
+Xvfb :99 -screen 0 1280x720x24 -ac &
+sleep 1
+
+# Start security monitor daemon.
+d "Starting secwatchd ..."
+SECWATCH_OPTS="--interval $CANARY_INTERVAL"
+if has_param 'HONEY_TOKENS='; then
+  SECWATCH_OPTS="$SECWATCH_OPTS --honeytokens"
+fi
+if has_param 'AUTO_REMEDIATE='; then
+  SECWATCH_OPTS="$SECWATCH_OPTS --auto-remediate"
+fi
+/usr/local/bin/secwatchd $SECWATCH_OPTS &
+SECWATCH_PID=$!
+
+# Start dbus for Chromium.
+mkdir -p /run/dbus
+dbus-daemon --system --fork 2>/dev/null
+
+# Launch Chromium under seccomp filter.
+d "Launching Chromium under seccomp ..."
+DISPLAY=:99 su -s /bin/sh browser -c "\
+  /usr/local/bin/seccomp_loader \
+  /usr/bin/chromium-browser \
+    --no-sandbox \
+    --disable-gpu \
+    --kiosk \
+    --proxy-server=socks5://$TORIP:$SOCKSPORT \
+    --host-resolver-rules='MAP * ~NOTFOUND, EXCLUDE $TORIP' \
+    --no-first-run \
+    --disable-default-apps \
+    --disable-translate \
+    --disable-sync \
+    --disable-background-networking \
+    --disable-breakpad \
+    --disable-component-update \
+    --disable-domain-reliability \
+    --disable-features=AutofillServerCommunication \
+    --user-data-dir=/home/browser/.config/chromium" &
+BROWSER_PID=$!
+
+d "Browser VM ready."
+echo
+
+# PID 1 signal handlers and zombie reaper.
+shutdown_vm() {
+  d "Shutting down Browser VM ..."
+  kill $BROWSER_PID 2>/dev/null
+  kill $SECWATCH_PID 2>/dev/null
+  kill $(jobs -p) 2>/dev/null
+  wait
+  sync
+  poweroff -f
+}
+trap shutdown_vm TERM INT
+trap '' HUP
+
+while true; do
+  wait -n 2>/dev/null || sleep 1
+done

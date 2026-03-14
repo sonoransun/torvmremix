@@ -338,6 +338,25 @@ func main() {
 
 		app := gui.New(cfg, engine, logger, ring, *configFile)
 
+		// Set up browser VM engine if enabled.
+		if cfg.Browser.Enabled {
+			browserEngine := lifecycle.NewBrowserEngine(cfg, logger, engine)
+			app.SetBrowserEngine(browserEngine)
+
+			// Auto-start browser when Tor reaches Running.
+			if cfg.Browser.AutoStart {
+				engine.OnStateChange(func(_, to lifecycle.State) {
+					if to == lifecycle.StateRunning {
+						logger.Info("auto-starting browser VM")
+						browserEngine.Start(context.Background())
+					}
+					if to == lifecycle.StateShutdown {
+						browserEngine.Stop()
+					}
+				})
+			}
+		}
+
 		// Signal handler for graceful shutdown in GUI mode.
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

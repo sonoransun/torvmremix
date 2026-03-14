@@ -31,6 +31,9 @@ type App struct {
 	serviceMode   bool
 	serviceTicker *time.Ticker
 
+	// Browser VM engine (nil if browser not enabled).
+	browserEngine *lifecycle.BrowserEngine
+
 	// Widgets updated by observers.
 	statusLight    *StatusLight
 	stateLabel     *widget.Label
@@ -91,6 +94,11 @@ func (a *App) Run() {
 		container.NewTabItem("Settings", a.settingsTab()),
 		container.NewTabItem("Logs", a.logTab()),
 	)
+
+	// Conditionally add Browser tab.
+	if a.cfg.Browser.Enabled && a.browserEngine != nil {
+		a.tabs.Append(container.NewTabItem("Browser", a.browserTab()))
+	}
 
 	// Conditionally add Service tab (returns nil on unsupported platforms).
 	if svcTab := a.serviceTab(); svcTab != nil {
@@ -167,6 +175,11 @@ func (a *App) showFailedDialog() {
 	)
 	d := dialog.NewCustom("TorVM Error", "Close", content, a.window)
 	d.Show()
+}
+
+// SetBrowserEngine sets the browser lifecycle engine for the GUI.
+func (a *App) SetBrowserEngine(be *lifecycle.BrowserEngine) {
+	a.browserEngine = be
 }
 
 // stopVM signals the lifecycle engine to shut down,
