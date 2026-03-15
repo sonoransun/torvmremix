@@ -285,7 +285,7 @@ else
   # Apply torrc overlay from state disk if present (whitelist allowed directives).
   if [ -f /home/torrc.override ]; then
     d "Applying torrc override ..."
-    TORRC_ALLOWED="^(Bridge|UseBridges|ClientTransportPlugin|FascistFirewall|ReachableAddresses|ReachableDirAddresses|ReachableORAddresses|HTTPSProxy|HTTPSProxyAuthenticator|Socks4Proxy|Socks5Proxy|Socks5ProxyUsername|Socks5ProxyPassword|ExcludeNodes|ExcludeExitNodes|ExitNodes|EntryNodes|StrictNodes|NumEntryGuards|CircuitBuildTimeout|LearnCircuitBuildTimeout|MaxCircuitDirtiness)[[:space:]]"
+    TORRC_ALLOWED="^(Bridge|UseBridges|ClientTransportPlugin|FascistFirewall|ReachableAddresses|ReachableDirAddresses|ReachableORAddresses|HTTPSProxy|HTTPSProxyAuthenticator|Socks4Proxy|Socks5Proxy|Socks5ProxyUsername|Socks5ProxyPassword|ExcludeNodes|ExcludeExitNodes|ExitNodes|EntryNodes|StrictNodes|NumEntryGuards|CircuitBuildTimeout|LearnCircuitBuildTimeout|MaxCircuitDirtiness|HiddenServiceDir|HiddenServicePort)[[:space:]]"
     grep -E "$TORRC_ALLOWED" /home/torrc.override >> /etc/tor/torrc
   fi
 

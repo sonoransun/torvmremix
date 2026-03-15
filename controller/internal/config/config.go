@@ -96,6 +96,33 @@ type EntropyConfig struct {
 	KernelEntropyBytes int `json:"kernel_entropy_bytes"`
 }
 
+// VectorConfig holds settings for vector (semantic) search using HNSW.
+type VectorConfig struct {
+	Enabled         bool   `json:"vector_enabled"`
+	IndexDir        string `json:"vector_index_dir"`
+	Dimension       int    `json:"vector_dimension"`         // embedding dimension (default 128 for TF-IDF)
+	ModelPath       string `json:"vector_model_path"`        // ONNX model path (optional, for neural embeddings)
+	HNSWm           int    `json:"vector_hnsw_m"`            // max connections per layer (default 16)
+	HNSWefConstruct int    `json:"vector_hnsw_ef_construct"` // build quality (default 200)
+	HNSWefSearch    int    `json:"vector_hnsw_ef_search"`    // query quality (default 50)
+	SearchMode      string `json:"vector_search_mode"`       // keyword, vector, hybrid
+	TopK            int    `json:"vector_top_k"`             // default results per query
+}
+
+// FHEConfig holds settings for FHE-encrypted document search and sharing.
+type FHEConfig struct {
+	Enabled           bool     `json:"fhe_enabled"`
+	IndexDir          string   `json:"fhe_index_dir"`
+	DocumentDirs      []string `json:"fhe_document_dirs"`
+	ShareEnabled      bool     `json:"fhe_share_enabled"`
+	HiddenServicePort int      `json:"fhe_hidden_service_port"`
+	Peers             []string `json:"fhe_peers"`
+	RingDegree        int      `json:"fhe_ring_degree"`
+	AutoIndex         bool     `json:"fhe_auto_index"`
+	AutoIndexInterval int      `json:"fhe_auto_index_interval"` // minutes
+	MaxIndexSizeMB    int      `json:"fhe_max_index_size_mb"`
+}
+
 // BrowserConfig holds settings for the hardened Chromium browser VM.
 type BrowserConfig struct {
 	Enabled           bool   `json:"browser_enabled"`
@@ -153,6 +180,8 @@ type Config struct {
 	Entropy       EntropyConfig `json:"entropy"`
 	Relays        RelayConfig   `json:"relays"`
 	Browser       BrowserConfig `json:"browser"`
+	FHE           FHEConfig     `json:"fhe"`
+	Vector        VectorConfig  `json:"vector"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -192,6 +221,24 @@ func DefaultConfig() *Config {
 			VirtioRNGMaxBytes:  1024,
 			VirtioRNGPeriod:    1000,
 			KernelEntropyBytes: 64,
+		},
+		Vector: VectorConfig{
+			Enabled:         false,
+			IndexDir:        filepath.Join("dist", "vector"),
+			Dimension:       128,
+			HNSWm:           16,
+			HNSWefConstruct: 200,
+			HNSWefSearch:    50,
+			SearchMode:      "hybrid",
+			TopK:            10,
+		},
+		FHE: FHEConfig{
+			Enabled:           false,
+			IndexDir:          filepath.Join("dist", "fhe"),
+			HiddenServicePort: 8443,
+			RingDegree:        12, // logN=12, N=4096
+			AutoIndexInterval: 60,
+			MaxIndexSizeMB:    512,
 		},
 		Browser: BrowserConfig{
 			Enabled:           false,
@@ -357,6 +404,49 @@ func (c *Config) Validate() error {
 		}
 		if strings.Contains(c.Entropy.SerialEntropyDevice, "..") {
 			return fmt.Errorf("Entropy.SerialEntropyDevice must not contain '..'")
+		}
+	}
+
+	// Validate vector search settings if enabled.
+	if c.Vector.Enabled {
+		if c.Vector.Dimension < 8 || c.Vector.Dimension > 2048 {
+			return fmt.Errorf("Vector.Dimension must be 8-2048, got %d", c.Vector.Dimension)
+		}
+		if c.Vector.HNSWm < 4 || c.Vector.HNSWm > 64 {
+			return fmt.Errorf("Vector.HNSWm must be 4-64, got %d", c.Vector.HNSWm)
+		}
+		if c.Vector.HNSWefConstruct < 10 || c.Vector.HNSWefConstruct > 1000 {
+			return fmt.Errorf("Vector.HNSWefConstruct must be 10-1000, got %d", c.Vector.HNSWefConstruct)
+		}
+		if c.Vector.HNSWefSearch < 10 || c.Vector.HNSWefSearch > 500 {
+			return fmt.Errorf("Vector.HNSWefSearch must be 10-500, got %d", c.Vector.HNSWefSearch)
+		}
+		if c.Vector.TopK < 1 || c.Vector.TopK > 1000 {
+			return fmt.Errorf("Vector.TopK must be 1-1000, got %d", c.Vector.TopK)
+		}
+		switch c.Vector.SearchMode {
+		case "keyword", "vector", "hybrid", "":
+			// valid
+		default:
+			return fmt.Errorf("invalid Vector.SearchMode: %q", c.Vector.SearchMode)
+		}
+	}
+
+	// Validate FHE settings if enabled.
+	if c.FHE.Enabled {
+		if c.FHE.RingDegree < 10 || c.FHE.RingDegree > 15 {
+			return fmt.Errorf("FHE.RingDegree must be 10-15 (logN), got %d", c.FHE.RingDegree)
+		}
+		if c.FHE.HiddenServicePort != 0 {
+			if err := validatePort("FHE.HiddenServicePort", c.FHE.HiddenServicePort); err != nil {
+				return err
+			}
+		}
+		if c.FHE.MaxIndexSizeMB < 1 || c.FHE.MaxIndexSizeMB > 10240 {
+			return fmt.Errorf("FHE.MaxIndexSizeMB must be 1-10240, got %d", c.FHE.MaxIndexSizeMB)
+		}
+		if c.FHE.AutoIndexInterval < 1 || c.FHE.AutoIndexInterval > 1440 {
+			return fmt.Errorf("FHE.AutoIndexInterval must be 1-1440 minutes, got %d", c.FHE.AutoIndexInterval)
 		}
 	}
 

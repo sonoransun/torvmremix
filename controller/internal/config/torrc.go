@@ -194,6 +194,13 @@ func (c *Config) TorrcOverlay() (string, error) {
 		lines = append(lines, "StrictNodes 1")
 	}
 
+	// FHE hidden service configuration for encrypted index sharing.
+	if c.FHE.Enabled && c.FHE.ShareEnabled && c.FHE.HiddenServicePort > 0 {
+		lines = append(lines, "HiddenServiceDir /home/tor/hidden_service/fhe_index")
+		lines = append(lines, fmt.Sprintf("HiddenServicePort %d %s:%d",
+			c.FHE.HiddenServicePort, c.HostIP, c.FHE.HiddenServicePort))
+	}
+
 	if len(lines) == 0 {
 		return "", nil
 	}
