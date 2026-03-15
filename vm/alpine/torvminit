@@ -107,8 +107,8 @@ if [ -c /dev/hwrng ]; then
   timeout 5 head -c 2048 /dev/hwrng > /dev/urandom 2>/dev/null
   d "Seeded entropy from hardware RNG (virtio-rng)"
 fi
-# also seed from sha1 of full cmdline
-sha1sum /proc/cmdline > /dev/urandom 2>/dev/null
+# also seed from sha256 of full cmdline
+sha256sum /proc/cmdline > /dev/urandom 2>/dev/null
 
 # Load hardware entropy kernel modules.
 # hw_random provides the /dev/hwrng framework; padlock-rng registers

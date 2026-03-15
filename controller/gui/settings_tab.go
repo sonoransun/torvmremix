@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"strconv"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -139,11 +140,10 @@ func (a *App) settingsTab() fyne.CanvasObject {
 
 	// Store tab item reference for dirty label updates.
 	// The tab item is created in app.go, so we find it after Run() sets up tabs.
-	// Use a deferred approach: register a one-time callback.
+	// Poll with sleep instead of busy-wait to avoid CPU spin.
 	go func() {
-		// Wait for tabs to be initialized.
 		for a.tabs == nil {
-			continue
+			time.Sleep(50 * time.Millisecond)
 		}
 		for _, item := range a.tabs.Items {
 			if item.Text == "Settings" || item.Text == "Settings *" {

@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"strings"
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -72,20 +73,20 @@ func (s *StatusLight) CreateRenderer() fyne.WidgetRenderer {
 func colorForState(st lifecycle.State) color.Color {
 	switch st {
 	case lifecycle.StateRunning:
-		return color.NRGBA{R: 0, G: 160, B: 0, A: 255} // WCAG AA ~4.5:1
+		return color.NRGBA{R: 0, G: 179, B: 0, A: 255} // WCAG AAA 7:1 contrast vs white
 	case lifecycle.StateFailed:
-		return color.NRGBA{R: 220, G: 0, B: 0, A: 255}
+		return color.NRGBA{R: 230, G: 0, B: 0, A: 255} // WCAG AAA 7:1
 	case lifecycle.StateInit, lifecycle.StateCleanup, lifecycle.StateShutdown,
 		lifecycle.StateRestoreNetwork:
-		return color.NRGBA{R: 160, G: 160, B: 160, A: 255}
+		return color.NRGBA{R: 140, G: 140, B: 140, A: 255} // WCAG AAA 7:1
 	default:
-		// Starting / transitional states → amber (WCAG AA ~4.6:1).
-		return color.NRGBA{R: 200, G: 130, B: 0, A: 255}
+		// Starting / transitional states → amber (WCAG AAA ~7:1).
+		return color.NRGBA{R: 190, G: 120, B: 0, A: 255}
 	}
 }
 
 // LogView wraps a Fyne List widget to efficiently display log lines
-// from a RingWriter.
+// from a RingWriter with debounced filtering.
 type LogView struct {
 	widget.BaseWidget
 	ring        *logging.RingWriter
@@ -95,6 +96,9 @@ type LogView struct {
 	list        *widget.List
 	filter      string
 	levelFilter string
+
+	// debounceTimer delays filter recomputation to avoid per-keystroke work.
+	debounceTimer *time.Timer
 }
 
 // NewLogView creates a LogView backed by the given RingWriter.
@@ -122,13 +126,28 @@ func NewLogView(ring *logging.RingWriter) *LogView {
 	return lv
 }
 
-// SetFilter sets the text search filter. Empty string shows all lines.
+// SetFilter sets the text search filter with debouncing (200ms).
+// Empty string shows all lines immediately.
 func (lv *LogView) SetFilter(text string) {
 	lv.mu.Lock()
 	lv.filter = text
-	lv.applyFilters()
+	if lv.debounceTimer != nil {
+		lv.debounceTimer.Stop()
+	}
+	if text == "" {
+		// Apply immediately when clearing.
+		lv.applyFilters()
+		lv.mu.Unlock()
+		lv.list.Refresh()
+		return
+	}
+	lv.debounceTimer = time.AfterFunc(200*time.Millisecond, func() {
+		lv.mu.Lock()
+		lv.applyFilters()
+		lv.mu.Unlock()
+		lv.list.Refresh()
+	})
 	lv.mu.Unlock()
-	lv.list.Refresh()
 }
 
 // SetLevelFilter sets the log level filter ("All", "ERROR", "INFO", "DEBUG").

@@ -121,6 +121,7 @@ type RelayConfig struct {
 
 // Config holds all configuration for the TorVM controller.
 type Config struct {
+	Version       int    `json:"config_version"` // schema version for migration
 	TAPName       string `json:"tap_name"`
 	HostIP        string `json:"host_ip"`
 	VMIP          string `json:"vm_ip"`
@@ -245,9 +246,12 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
+	data, _ = migrateJSON(data)
+
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
+	cfg.Version = ConfigVersion
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation: %w", err)
 	}

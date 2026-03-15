@@ -100,6 +100,45 @@ func (g *GlobeWidget) Dragged(ev *fyne.DragEvent) {
 // DragEnd implements fyne.Draggable.
 func (g *GlobeWidget) DragEnd() {}
 
+// TypedKey implements fyne.Focusable for keyboard-based globe rotation.
+func (g *GlobeWidget) TypedKey(ev *fyne.KeyEvent) {
+	g.mu.Lock()
+	switch ev.Name {
+	case fyne.KeyLeft:
+		g.rotation += 10
+	case fyne.KeyRight:
+		g.rotation -= 10
+	case fyne.KeyUp:
+		g.tilt -= 10
+		if g.tilt < -90 {
+			g.tilt = -90
+		}
+	case fyne.KeyDown:
+		g.tilt += 10
+		if g.tilt > 90 {
+			g.tilt = 90
+		}
+	case fyne.KeyPlus, fyne.KeyEqual:
+		// Zoom in (not implemented — placeholder for future)
+	case fyne.KeyMinus:
+		// Zoom out (not implemented — placeholder for future)
+	default:
+		g.mu.Unlock()
+		return
+	}
+	g.mu.Unlock()
+	g.renderFrame()
+}
+
+// TypedRune implements fyne.Focusable.
+func (g *GlobeWidget) TypedRune(_ rune) {}
+
+// FocusGained implements fyne.Focusable.
+func (g *GlobeWidget) FocusGained() {}
+
+// FocusLost implements fyne.Focusable.
+func (g *GlobeWidget) FocusLost() {}
+
 // Tapped implements fyne.Tappable for node hit-testing.
 func (g *GlobeWidget) Tapped(ev *fyne.PointEvent) {
 	if g.OnNodeTapped == nil {
